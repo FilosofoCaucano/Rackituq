@@ -75,7 +75,8 @@
     ;; Con un solo argumento se muestra tal cual; con dos, el primero es el formato
     [(string=? comando "mostrar.salida")
      (if y
-         (mostrar-salida x y)
+         ;; El valor puede ser el nombre de una variable: mostrar.salida "Hola ~a" nombre
+         (mostrar-salida x (if (and (string? y) (hash-has-key? variables y)) (hash-ref variables y) y))
          (mostrar-salida "~a" x))]
     
     ;; Manejo de memoria

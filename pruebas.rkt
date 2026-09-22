@@ -79,7 +79,9 @@
 (test-case "mostrar.salida funciona con uno o dos argumentos"
   (check-equal? (salida-de (lambda () (ejecutar-comando "mostrar.salida" "Hola Mundo"))) "Hola Mundo\n")
   (check-equal? (salida-de (lambda () (ejecutar-comando "mostrar.salida" "Hola ~a" "Mundo"))) "Hola Mundo\n")
-  (check-equal? (salida-de (lambda () (ejecutar-linea "mostrar.salida \"Hola Mundo\""))) "Hola Mundo\n"))
+  (check-equal? (salida-de (lambda () (ejecutar-linea "mostrar.salida \"Hola Mundo\""))) "Hola Mundo\n")
+  (ejecutar-linea "definir.variable p-nombre \"Mundo\"")
+  (check-equal? (salida-de (lambda () (ejecutar-linea "mostrar.salida \"Hola ~a\" p-nombre"))) "Hola Mundo\n"))
 
 ;; ----- ESTILO AGLUTINANTE -----
 
