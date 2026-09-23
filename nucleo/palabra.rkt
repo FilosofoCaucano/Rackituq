@@ -1,7 +1,8 @@
 #lang racket
 
 (require "estado.rkt" "vocabulario.rkt")
-(provide hablar evaluar-palabra ejecutar-palabra segmentar)
+(provide hablar evaluar-palabra ejecutar-palabra segmentar explicar tokenizar
+         limite-repeticiones)
 
 ;; ----- SEGMENTADOR DE PALABRAS AGLUTINANTES -----
 ;;
@@ -22,13 +23,6 @@
 ;;     ?         pregunta: responde sí/no
 ;;     -guni     condicional ("si..."): el resto de la oración va solo si es cierta
 ;;     -gaangat  habitual ("cada vez que..."): repite el resto mientras sea cierta
-
-;; Un elemento es un texto entre comillas, una lista de números, un número o un nombre
-(define patron-elemento
-  (pregexp (string-append "\"[^\"]*\""
-                          "|-?[0-9]+(?:\\.[0-9]+)?(?:,-?[0-9]+(?:\\.[0-9]+)?)+"
-                          "|-?[0-9]+(?:\\.[0-9]+)?"
-                          "|[^.:\"\\s]+")))
 
 ;; Una pieza es un elemento con sus complementos: `desde:1:3`
 (define patron-pieza
@@ -82,15 +76,17 @@
 
 ;; ¿La raíz es un literal o una variable?
 (define (tiene-valor? raiz)
-  (or (regexp-match? #px"^\".*\"$" raiz)
+  (or (texto-literal? raiz)
+      (lista-literal? raiz)
       (string->number raiz)
-      (and (string-contains? raiz ",") (andmap string->number (string-split raiz ",")))
       (hash-has-key? variables raiz)))
 
 ;; Evaluar una palabra: devuelve su valor y su modo.
 ;; `posicionales` son los argumentos que van después de la palabra;
 ;; `entrada`, si se da, reemplaza a la raíz como valor inicial.
-(define (evaluar-palabra palabra [posicionales '()] #:entrada [entrada sin-valor])
+(define (evaluar-palabra palabra [posicionales '()] #:entrada [entrada sin-valor]
+                         ;; `paso` recibe (nombre complementos valor) después de cada morfema
+                         #:paso [paso void])
   (let*-values ([(cuerpo modo) (separar-modo palabra)]
                 [(raiz morfemas) (segmentar cuerpo)]
                 [(inicial args usa-raiz?)
@@ -103,13 +99,16 @@
                    [else (error (format "Error: No conozco la palabra ~a" raiz))])])
     (when (and (empty? morfemas) (pair? args))
       (error (format "Error: ~a no tiene sufijos que usen los argumentos ~a" palabra args)))
+    (paso "raíz" (list raiz) inicial)
     (values (for/fold ([valor inicial])
                       ([m morfemas]
                        [i (in-naturals)])
-              (if (zero? i)
-                  ;; El primer morfema recibe también los argumentos posicionales
-                  (aplicar-morfema valor (car m) (append (cdr m) args) (and usa-raiz? raiz))
-                  (aplicar-morfema valor (car m) (cdr m))))
+              (let* ([complementos (if (zero? i) (append (cdr m) args) (cdr m))]
+                     ;; El primer morfema recibe también los argumentos posicionales
+                     [nuevo (aplicar-morfema valor (car m) complementos
+                                             (and (zero? i) usa-raiz? raiz))])
+                (paso (car m) complementos nuevo)
+                nuevo))
             modo)))
 
 ;; Igual que evaluar-palabra, pero solo el valor
@@ -119,12 +118,16 @@
 
 ;; ----- ORACIONES -----
 
+;; Palabras que arman la oración y nunca son argumentos
+(define palabras-clave '("sino"))
+
 ;; Un token es argumento de la palabra anterior si es un número, un texto
 ;; entre comillas o un nombre suelto (sin punto)
 (define (argumento? token)
-  (or (string->number token)
-      (regexp-match? #px"^\"[^\"]*\"$" token)
-      (not (string-contains? token "."))))
+  (and (not (member token palabras-clave))
+       (or (string->number token)
+           (texto-literal? token)
+           (not (string-contains? token ".")))))
 
 ;; Agrupar los tokens en palabras con sus argumentos: ((palabra arg ...) ...)
 (define (agrupar tokens)
@@ -137,6 +140,13 @@
 (define (evaluar-grupo grupo)
   (evaluar-palabra (first grupo) (rest grupo)))
 
+;; Partir los grupos en lo que va antes y después de `sino`
+(define (partir-en-sino grupos)
+  (let ([i (index-where grupos (lambda (g) (equal? (first g) "sino")))])
+    (if i
+        (values (take grupos i) (drop grupos (add1 i)))
+        (values grupos '()))))
+
 ;; Evaluar una oración: palabras separadas por espacios
 (define (evaluar-oracion grupos)
   (if (empty? grupos)
@@ -147,7 +157,12 @@
           [(pregunta)
            (if (empty? resto) (texto-rackituq valor) (evaluar-oracion resto))]
           [(condicional)
-           (if valor (evaluar-oracion resto) "Condición falsa")]
+           ;; `sino` parte la oración en las dos ramas
+           (let-values ([(entonces si-no) (partir-en-sino resto)])
+             (cond
+               [valor (evaluar-oracion entonces)]
+               [(empty? si-no) "Condición falsa"]
+               [else (evaluar-oracion si-no)]))]
           [(habitual)
            (let loop ([cierto valor] [vueltas 0])
              (cond
@@ -161,6 +176,28 @@
           [else
            (if (empty? resto) valor (evaluar-oracion resto))]))))
 
+;; Partir la línea en tokens respetando los textos entre comillas
+(define (tokenizar linea)
+  (regexp-match* #px"(?:\"[^\"]*\"|[^\\s\"])+" linea))
+
 ;; Punto de entrada: una línea de Rackituq
 (define (hablar oracion)
-  (evaluar-oracion (agrupar (regexp-match* #px"(?:\"[^\"]*\"|[^\\s\"])+" oracion))))
+  (evaluar-oracion (agrupar (tokenizar oracion))))
+
+;; ----- EXPLICAR -----
+
+;; Mostrar una línea paso a paso: qué hace cada morfema con el valor
+(define (explicar linea)
+  (for ([grupo (agrupar (tokenizar linea))])
+    (displayln (string-join grupo " "))
+    (let-values ([(valor modo)
+                  (evaluar-palabra
+                   (first grupo) (rest grupo)
+                   #:paso (lambda (nombre complementos valor)
+                            (printf "   ~a  →  ~a\n"
+                                    (if (string=? nombre "raíz")
+                                        (format "raíz ~a" (first complementos))
+                                        (string-join (cons nombre (map texto-rackituq complementos)) ":"))
+                                    (texto-rackituq valor))))])
+      (unless (eq? modo 'afirmacion)
+        (printf "   modo ~a  →  ~a\n" modo (texto-rackituq valor))))))

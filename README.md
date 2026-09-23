@@ -31,7 +31,7 @@ Para el REPL, descomenta `(repl)` en `Lengua Rackituq.rkt`. Se sale con `salir`.
   lista1 .  solo     :  mayor:15  .  cada:entre:10  .  suma  ?
 ```
 
-- **Raíz**: un valor (`5`, `3.5`, `1,2,3`, `"hola"`) o una variable (`lista1`).
+- **Raíz**: un valor (`5`, `3.5`, `1,2,3`, `"a","b"`, `"hola"`) o una variable (`lista1`).
 - **Morfemas**: se aplican de izquierda a derecha, cada uno sobre el resultado
   del anterior, como un pipe de Unix. El punto siempre separa morfemas.
 - **Complementos**: van pegados con `:` (`mas:3`, `sublista:1:3`).
@@ -41,8 +41,26 @@ Para el REPL, descomenta `(repl)` en `Lengua Rackituq.rkt`. Se sale con `salir`.
 |---|---|---|
 | *(ninguno)* | afirmación: devuelve el valor | `5.mas:3` → 8 |
 | `?` | pregunta: responde sí/no | `7.impar?` → sí |
-| `-guni` | condicional (kalaallisut *-guni*, "si…") | `x.mayor:0-guni "positivo".muestra` |
+| `-guni` | condicional (kalaallisut *-guni*, "si…") | `x.mayor:0-guni "positivo".muestra sino "negativo".muestra` |
 | `-gaangat` | habitual (kalaallisut *-gaangat*, "cada vez que…") | `i.menor:5-gaangat i.mas:1.en:i` |
+
+La palabra `sino` parte el condicional en sus dos ramas:
+
+```
+edad.mayor:17-guni "adulto".muestra sino "menor".muestra
+```
+
+### Ver una palabra por dentro
+
+`explicar` muestra qué hace cada morfema con el valor:
+
+```
+Racketiitut> explicar 1,2,3,4,5,6.solo:par.cada:por:10.suma
+   raíz 1,2,3,4,5,6  →  (1 2 3 4 5 6)
+   solo:par  →  (2 4 6)
+   cada:por:10  →  (20 40 60)
+   suma  →  120
+```
 
 ### Argumentos después de la palabra
 
@@ -106,7 +124,8 @@ Estos no son palabras sino comandos con argumentos separados por espacios:
 | `definir.funcion`, `definir.funcion.recursiva` | desde Racket, con el cuerpo como s-expresión |
 | `actualizar.variable` | `actualizar.variable edad 17` (respeta el tipo declarado) |
 | `si` | `si edad 17 > x.sum.ar 1` |
-| `mientras` | `mientras i 5 < x.sum.ar 1` (el resultado se guarda en `i`) |
+| `mientras` | `mientras i 5 < x.sum.ar.en:i 1` (el cuerpo guarda el nuevo valor con `.en:`) |
+| `explicar` | `explicar 5.mas:3.por:2` |
 | `mostrar.salida` | `mostrar.salida "Hola Mundo"` o `mostrar.salida "Hola ~a" nombre` |
 | `importar.modulo`, `exportar.modulo` | guardan y cargan variables en un archivo |
 | `mem.limpiar` | vacía la caché de `mem.cache` |

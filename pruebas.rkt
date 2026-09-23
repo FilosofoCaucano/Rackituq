@@ -68,8 +68,13 @@
                 "Variable p-e definida como número con valor 16")
   (check-equal? (ejecutar-linea "si p-e 17 < x.sum.ar 100") 116)
   (ejecutar-linea "definir.variable p-i 0")
-  (check-equal? (ejecutar-linea "mientras p-i 5 < x.sum.ar 1") "Bucle terminado")
+  ;; el cuerpo guarda el nuevo valor con .en:
+  (check-equal? (ejecutar-linea "mientras p-i 5 < x.sum.ar.en:p-i 1") "Bucle terminado")
   (check-equal? (hash-ref variables "p-i") 5))
+
+(test-case "un mientras que no avanza se corta con un error que lo explica"
+  (ejecutar-linea "definir.variable p-quieto 0")
+  (check-exn #rx"demasiadas vueltas" (lambda () (ejecutar-linea "mientras p-quieto 3 < x.sum.ar 1"))))
 
 (test-case "las operaciones binarias reciben sus dos argumentos"
   (check-equal? (ejecutar-comando "x.sum.ar" 2 3) 5)
@@ -110,6 +115,30 @@
   (hablar "0.en:p-j")
   (check-equal? (hablar "p-j.menor:5-gaangat p-j.mas:1.en:p-j") "Bucle terminado")
   (check-equal? (hash-ref variables "p-j") 5))
+
+(test-case "sino: la otra rama del condicional"
+  (hablar "16.en:p-menor")
+  (check-equal? (salida-de (lambda () (hablar "p-menor.mayor:17-guni \"adulto\".muestra sino \"menor\".muestra")))
+                "menor\n")
+  (hablar "20.en:p-menor")
+  (check-equal? (salida-de (lambda () (hablar "p-menor.mayor:17-guni \"adulto\".muestra sino \"menor\".muestra")))
+                "adulto\n")
+  ;; sin sino, una condición falsa sigue avisando
+  (hablar "16.en:p-menor")
+  (check-equal? (hablar "p-menor.mayor:17-guni \"adulto\".muestra") "Condición falsa"))
+
+(test-case "listas de texto y mezcladas"
+  (check-equal? (hablar "\"a\",\"b\",\"c\".cada:mayusculas.une:\"-\"") "A-B-C")
+  (check-equal? (hablar "\"a\",\"b\".cuenta") 2)
+  (check-equal? (hablar "1,\"dos\",3.cuenta") 3)
+  (check-equal? (hablar "\"hola mundo\",\"chao\".primero") "hola mundo"))
+
+(test-case "explicar muestra la palabra paso a paso"
+  (check-equal? (salida-de (lambda () (explicar "1,2,3.cada:por:10.suma")))
+                (string-append "1,2,3.cada:por:10.suma\n"
+                               "   raíz 1,2,3  →  (1 2 3)\n"
+                               "   cada:por:10  →  (10 20 30)\n"
+                               "   suma  →  60\n")))
 
 (test-case "tipos desde las palabras"
   (ejecutar-comando "definir.variable.tipo" "p-t" 3 'numero)

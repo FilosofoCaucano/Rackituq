@@ -5,10 +5,6 @@
 
 ;; ----- REPL (Read-Eval-Print Loop) -----
 
-;; Partir la línea en tokens respetando los textos entre comillas
-(define (tokenizar linea)
-  (regexp-match* #px"(?:\"[^\"]*\"|[^\\s\"])+" linea))
-
 ;; Argumento de un comando especial: "5" -> 5, "\"hola mundo\"" -> "hola mundo"
 (define (leer-argumento token)
   (cond
@@ -32,6 +28,9 @@
   (let ([tokens (tokenizar entrada)])
     (cond
       [(empty? tokens) (void)]
+      ;; `explicar <línea>` muestra la palabra paso a paso
+      [(string=? (first tokens) "explicar")
+       (explicar (string-join (rest tokens) " "))]
       [(comando-especial? (first tokens))
        (let ([args (map leer-argumento (rest tokens))])
          (if (empty? args)

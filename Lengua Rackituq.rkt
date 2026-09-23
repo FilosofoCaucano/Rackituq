@@ -22,3 +22,14 @@
 ;; Sufijos nuevos, definidos en Rackituq mismo
 (void (ejecutar-comando "definir.sufijo" "cuadrado" "a-la:2"))
 (void (hablar "decenas.cada:cuadrado.suma.muestra"))
+
+;; Sufijos con complementos propios: los huecos son $1, $2
+(void (ejecutar-comando "definir.sufijo" "aumentar-en" "mas:$1"))
+(void (hablar "decenas.cada:aumentar-en:100.muestra"))
+
+;; Texto y condicional con sus dos ramas
+(void (hablar "\"a\",\"b\",\"c\".cada:mayusculas.une:\"-\".muestra"))
+(void (hablar "decenas.cuenta.mayor:10-guni \"muchas\".muestra sino \"pocas\".muestra"))
+
+;; Ver una palabra por dentro, morfema por morfema
+(explicar "1,2,3,4,5,6.solo:par.cada:por:10.suma")

@@ -2,7 +2,7 @@
 
 (require "estado.rkt" "variables.rkt")
 (provide buscar-morfema piezas-maximas aplicar-morfema resolver resolver-valor
-         listo texto-rackituq)
+         listo texto-rackituq patron-elemento texto-literal? lista-literal?)
 
 ;; ----- DICCIONARIO DE MORFEMAS -----
 ;;
@@ -38,14 +38,33 @@
 ;; (por ejemplo un texto que salió de una lista)
 (struct listo (valor))
 
+;; ----- FORMA DE LOS ELEMENTOS -----
+
+;; Un texto entre comillas: "hola mundo"
+(define patron-texto "\"[^\"]*\"")
+;; Un número: 5, -3, 3.5
+(define patron-numero "-?[0-9]+(?:\\.[0-9]+)?")
+;; Una lista escrita con comas: 1,2,3 o "a","b" o 1,"dos"
+(define patron-lista
+  (format "(?:~a|~a)(?:,(?:~a|~a))+" patron-texto patron-numero patron-texto patron-numero))
+;; Un elemento es una lista, un texto, un número o un nombre
+(define patron-elemento
+  (pregexp (format "~a|~a|~a|[^.:\"\\s]+" patron-lista patron-texto patron-numero)))
+
+(define (calza? patron elemento)
+  (regexp-match? (pregexp (format "^(?:~a)$" patron)) elemento))
+
+(define (texto-literal? elemento) (calza? patron-texto elemento))
+(define (lista-literal? elemento) (calza? patron-lista elemento))
+
 ;; Convertir un texto del programa en su valor
 (define (resolver elemento)
   (cond
-    [(regexp-match? #px"^\".*\"$" elemento)
+    [(texto-literal? elemento)
      (substring elemento 1 (sub1 (string-length elemento)))]
-    [(and (string-contains? elemento ",")
-          (andmap string->number (string-split elemento ",")))
-     (map string->number (string-split elemento ","))]
+    [(lista-literal? elemento)
+     ;; Las comas separan, pero no dentro de las comillas
+     (map resolver (regexp-match* (pregexp (format "~a|[^,]+" patron-texto)) elemento))]
     [(string->number elemento) => values]
     [(hash-has-key? variables elemento) (hash-ref variables elemento)]
     [else (error (format "Error: No conozco la palabra ~a" elemento))]))

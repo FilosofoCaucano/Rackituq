@@ -51,15 +51,18 @@
                            #:entrada (obtener-variable x))
          "Condición falsa")]
     
+    ;; El cuerpo guarda el nuevo valor con `.en:` igual que en -gaangat:
+    ;; mientras i 5 < x.sum.ar.en:i 1
     [(string=? comando "mientras")
-     (let loop ([valor-x (obtener-variable x)])
-       (if (evaluar-condicion valor-x operador y)
-           (begin
-             ;; El resultado del cuerpo se guarda en la variable; si no, el bucle nunca avanza
-             (actualizar-variable x (ejecutar-palabra operacion (sin-vacios-al-final (list param))
-                                                      #:entrada valor-x))
-             (loop (obtener-variable x)))
-           "Bucle terminado"))]
+     (let loop ([vueltas 0])
+       (cond
+         [(not (evaluar-condicion (obtener-variable x) operador y)) "Bucle terminado"]
+         [(>= vueltas limite-repeticiones)
+          (error (format "Error: mientras dio demasiadas vueltas; ¿el cuerpo guarda el nuevo valor en ~a?" x))]
+         [else
+          (ejecutar-palabra operacion (sin-vacios-al-final (list param))
+                            #:entrada (obtener-variable x))
+          (loop (add1 vueltas))]))]
     
     ;; Manejo de módulos
     [(string=? comando "importar.modulo")
