@@ -2,7 +2,8 @@
 
 (require "estado.rkt" "variables.rkt")
 (provide buscar-morfema piezas-maximas aplicar-morfema resolver resolver-valor
-         listo texto-rackituq patron-elemento texto-literal? lista-literal?)
+         listo texto-rackituq texto-literal? lista-literal? sub-palabra?
+         instalar-evaluador!)
 
 ;; ----- DICCIONARIO DE MORFEMAS -----
 ;;
@@ -20,17 +21,19 @@
 
 (define diccionario (make-hash))
 
+;; Cuántas piezas separadas por punto tiene el nombre más largo (`sub.lista` = 2).
+;; Se guarda al registrar, porque el segmentador lo consulta en cada pieza
+(define max-piezas 1)
+
 (define (definir-morfema nombres clase proc)
   (for ([nombre nombres])
-    (hash-set! diccionario nombre (morfema clase proc))))
+    (hash-set! diccionario nombre (morfema clase proc))
+    (set! max-piezas (max max-piezas (length (string-split nombre "." #:trim? #f))))))
 
 (define (buscar-morfema nombre)
   (hash-ref diccionario nombre #f))
 
-;; Cuántas piezas separadas por punto tiene el nombre más largo (`sub.lista` = 2)
-(define (piezas-maximas)
-  (for/fold ([m 1]) ([nombre (in-hash-keys diccionario)])
-    (max m (length (string-split nombre "." #:trim? #f)))))
+(define (piezas-maximas) max-piezas)
 
 ;; ----- RESOLUCIÓN DE VALORES -----
 
@@ -47,25 +50,41 @@
 ;; Una lista escrita con comas: 1,2,3 o "a","b" o 1,"dos"
 (define patron-lista
   (format "(?:~a|~a)(?:,(?:~a|~a))+" patron-texto patron-numero patron-texto patron-numero))
-;; Un elemento es una lista, un texto, un número o un nombre
-(define patron-elemento
-  (pregexp (format "~a|~a|~a|[^.:\"\\s]+" patron-lista patron-texto patron-numero)))
+;; Las expresiones regulares se compilan una sola vez: se usan en cada morfema
+(define regex-lista (pregexp (format "^(?:~a)$" patron-lista)))
+(define regex-pedazo-lista (pregexp (format "~a|[^,]+" patron-texto)))
+(define regex-texto (pregexp (format "^(?:~a)$" patron-texto)))
 
-(define (calza? patron elemento)
-  (regexp-match? (pregexp (format "^(?:~a)$" patron)) elemento))
+;; Un solo texto entre comillas; "a","b" son dos, no uno
+(define (texto-literal? elemento)
+  (and (string-prefix? elemento "\"")
+       (regexp-match? regex-texto elemento)))
 
-(define (texto-literal? elemento) (calza? patron-texto elemento))
-(define (lista-literal? elemento) (calza? patron-lista elemento))
+(define (lista-literal? elemento)
+  (and (string-contains? elemento ",")
+       (regexp-match? regex-lista elemento)))
+
+;; Una sub-palabra entre paréntesis: por:(3.mas:1)
+(define (sub-palabra? elemento)
+  (and (string-prefix? elemento "(") (string-suffix? elemento ")")))
+
+;; palabra.rkt instala aquí cómo se evalúa una sub-palabra
+(define evaluador-sub-palabra (box #f))
+(define (instalar-evaluador! f) (set-box! evaluador-sub-palabra f))
 
 ;; Convertir un texto del programa en su valor
 (define (resolver elemento)
   (cond
+    ;; Primero lo barato: número, texto, sub-palabra
+    [(string->number elemento) => values]
     [(texto-literal? elemento)
      (substring elemento 1 (sub1 (string-length elemento)))]
+    ;; Una sub-palabra se evalúa antes: 5.por:(4.menos:1) = 15
+    [(sub-palabra? elemento)
+     ((unbox evaluador-sub-palabra) (substring elemento 1 (sub1 (string-length elemento))))]
     [(lista-literal? elemento)
      ;; Las comas separan, pero no dentro de las comillas
-     (map resolver (regexp-match* (pregexp (format "~a|[^,]+" patron-texto)) elemento))]
-    [(string->number elemento) => values]
+     (map resolver (regexp-match* regex-pedazo-lista elemento))]
     [(hash-has-key? variables elemento) (hash-ref variables elemento)]
     [else (error (format "Error: No conozco la palabra ~a" elemento))]))
 
@@ -122,6 +141,10 @@
 (definir-morfema '("mod.ul" "modulo" "mod")            'valor modulo)
 (definir-morfema '("dobla")                            'valor (lambda (v) (* v 2)))
 (definir-morfema '("neg")                              'valor -)
+;; 39/5 es exacto pero se lee mal: .decimal da 7.8, .redondea da 8
+(definir-morfema '("decimal")                          'valor exact->inexact)
+(definir-morfema '("redondea")                         'valor (lambda (v) (inexact->exact (round v))))
+(definir-morfema '("promedio")                         'valor (lambda (l) (/ (apply + l) (length l))))
 
 ;; ----- FUNCIONES MATEMÁTICAS -----
 (definir-morfema '("raiz")                          'valor sqrt)

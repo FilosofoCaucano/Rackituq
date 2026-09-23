@@ -172,6 +172,53 @@
   (check-equal? (hablar "1,2,3.concatenar:4,5") '(1 2 3 4 5))
   (check-equal? (hablar "1,2,3.cuenta") 3))
 
+(test-case "sub-palabras entre paréntesis"
+  (check-equal? (hablar "5.por:(4.menos:1)") 15)
+  (check-equal? (hablar "(2.mas:3).por:2") 10)
+  (check-equal? (hablar "10.menos:(2.por:(1.mas:2))") 4)
+  (check-equal? (hablar "1,2,3.cada:por:(1.mas:1)") '(2 4 6))
+  ;; el punto decimal sigue siendo parte del número
+  (check-equal? (hablar "3.5.dobla") 7.0))
+
+(test-case "recursión escrita en Rackituq con $0"
+  (ejecutar-linea "definir.sufijo p-fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.p-fact)")
+  (check-equal? (hablar "5.p-fact") 120)
+  (check-equal? (hablar "1,2,3,4,5.cada:p-fact") '(1 2 6 24 120))
+  (ejecutar-linea "definir.sufijo p-fib $0.menor:2-guni $0 sino ($0.menos:1.p-fib).mas:($0.menos:2.p-fib)")
+  (check-equal? (hablar "10.p-fib") 55))
+
+(test-case "promedios legibles"
+  (check-equal? (hablar "7,8,10,5,9.promedio") 39/5)
+  (check-equal? (hablar "7,8,10,5,9.promedio.decimal") 7.8)
+  (check-equal? (hablar "7,8,10,5,9.promedio.redondea") 8))
+
+(test-case "correr un programa guardado"
+  (define archivo (make-temporary-file "rackituq-~a.rkq"))
+  (display-to-file (string-join '(";; un programa de prueba"
+                                  "definir.variable p-notas2 7,8,10"
+                                  ""
+                                  "p-notas2.promedio.decimal.en:p-prom")
+                                "\n")
+                   archivo #:exists 'replace)
+  (check-equal? (correr-archivo archivo) (format "Programa ~a terminado" archivo))
+  (check-equal? (hash-ref variables "p-prom") 8.333333333333334)
+  ;; un error dice en qué línea fue
+  (display-to-file "banana.suma" archivo #:exists 'replace)
+  (check-exn #rx"en la línea 1" (lambda () (correr-archivo archivo)))
+  (delete-file archivo))
+
+(test-case "explicar dice qué rama toma el condicional"
+  (check-equal? (salida-de (lambda () (explicar "16.mayor:17-guni \"grande\".muestra sino \"chico\".muestra")))
+                (string-append "16.mayor:17-guni\n"
+                               "   raíz 16  →  16\n"
+                               "   mayor:17  →  no\n"
+                               "   modo condicional  →  no\n"
+                               "   condición falsa  →  toma la rama sino\n"
+                               "\"chico\".muestra\n"
+                               "   raíz \"chico\"  →  chico\n"
+                               "chico\n"
+                               "   muestra  →  chico\n")))
+
 (test-case "errores claros"
   (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "banana.suma")))
   (check-exn #rx"No conozco el sufijo volar" (lambda () (hablar "5.volar")))

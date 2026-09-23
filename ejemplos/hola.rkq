@@ -1,0 +1,11 @@
+;; Un programa Rackituq: una línea por instrucción
+"Hola Mundo".mostrar
+
+;; Variables y listas
+definir.variable notas 7,8,10,5,9
+notas.solo:mayor:6.cuenta.texto.concatenar:" notas pasaron".mostrar
+notas.promedio.decimal.mostrar
+
+;; Un sufijo propio
+definir.sufijo aumentar-en mas:$1
+notas.cada:aumentar-en:1.mostrar

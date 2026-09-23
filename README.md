@@ -18,11 +18,18 @@ edad.mayor:17-guni "adulto".muestra          → adulto (si edad > 17)
 ## Cómo correrlo
 
 ```
-racket "Lengua Rackituq.rkt"     # la demo
-raco test pruebas.rkt            # las pruebas
+racket "Lengua Rackituq.rkt"                    # la demo
+racket "Lengua Rackituq.rkt" ejemplos/hola.rkq  # un programa guardado
+raco test pruebas.rkt                           # las pruebas
 ```
 
 Para el REPL, descomenta `(repl)` en `Lengua Rackituq.rkt`. Se sale con `salir`.
+Dentro del REPL, `correr ejemplos/hola.rkq` ejecuta un programa.
+
+## Programas en archivo
+
+Un `.rkq` es una línea por instrucción; las líneas vacías y las que empiezan
+con `;;` son comentarios. Hay ejemplos en [ejemplos/](ejemplos/).
 
 ## Anatomía de una palabra
 
@@ -34,7 +41,8 @@ Para el REPL, descomenta `(repl)` en `Lengua Rackituq.rkt`. Se sale con `salir`.
 - **Raíz**: un valor (`5`, `3.5`, `1,2,3`, `"a","b"`, `"hola"`) o una variable (`lista1`).
 - **Morfemas**: se aplican de izquierda a derecha, cada uno sobre el resultado
   del anterior, como un pipe de Unix. El punto siempre separa morfemas.
-- **Complementos**: van pegados con `:` (`mas:3`, `sublista:1:3`).
+- **Complementos**: van pegados con `:` (`mas:3`, `sublista:1:3`). Un complemento
+  puede ser otra palabra entre paréntesis: `suma.entre:(notas.cuenta)`.
 - **Modo**: va al final de la palabra y dice qué hacer con ella.
 
 | Modo | Significado | Ejemplo |
@@ -82,7 +90,7 @@ dentro de complementos: `cada:sumar:1`.
 
 | Grupo | Morfemas (nombre clásico / alias) |
 |---|---|
-| Aritmética | `sum.ar`/`sumar`/`mas`, `rest.ar`/`restar`/`menos`, `mult.iplicar`/`multiplicar`/`por`, `div.idir`/`dividir`/`entre`, `pot.enciar`/`potenciar`/`a-la`, `mod.ul`/`modulo`/`mod`, `dobla`, `neg` |
+| Aritmética | `sum.ar`/`sumar`/`mas`, `rest.ar`/`restar`/`menos`, `mult.iplicar`/`multiplicar`/`por`, `div.idir`/`dividir`/`entre`, `pot.enciar`/`potenciar`/`a-la`, `mod.ul`/`modulo`/`mod`, `dobla`, `neg`, `promedio`, `decimal`, `redondea` |
 | Matemática | `raiz`, `sin.us`/`seno`, `cos.inus`/`coseno`, `tan.gente`/`tangente`, `log.aritmo`/`logaritmo`, `exp.onencial`/`exponencial`, `abs.oluto`/`absoluto`/`abs`, `rand.aleatorio`/`aleatorio`, `min.imo`/`minimo`, `max.imo`/`maximo` |
 | Listas | `lista`, `sub.lista`/`sublista`/`desde`, `ind.ice`/`indice`, `prim.ero`/`primero`, `ult.imo`/`ultimo`, `suma`, `producto`, `invierte`, `ordena`, `con` |
 | Texto | `texto`, `mayusculas`, `minusculas`, `recorta`, `parte:" "`, `une:"-"`, `reemplaza:viejo:nuevo` |
@@ -109,6 +117,19 @@ definir.sufijo aumentar-en mas:$1
 1,2,3.cada:aumentar-en:10    → (11 12 13)
 ```
 
+Si el cuerpo nombra `$0` (el valor que recibe el sufijo), se lee como una
+oración completa: puede llevar modos y **llamarse a sí mismo**. Así se escribe
+la recursión sin salir de Rackituq:
+
+```
+definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
+5.fact                       → 120
+1,2,3,4,5.cada:fact          → (1 2 6 24 120)
+
+definir.sufijo cuenta-atras $0.cero-guni "despegue".muestra sino $0.muestra.menos:1.cuenta-atras
+3.cuenta-atras               → 3, 2, 1, despegue
+```
+
 Las funciones definidas con `definir.funcion` y `definir.funcion.recursiva`
 también se pegan como sufijos: `5.fact.mas:1`.
 
@@ -129,6 +150,10 @@ Estos no son palabras sino comandos con argumentos separados por espacios:
 | `mostrar.salida` | `mostrar.salida "Hola Mundo"` o `mostrar.salida "Hola ~a" nombre` |
 | `importar.modulo`, `exportar.modulo` | guardan y cargan variables en un archivo |
 | `mem.limpiar` | vacía la caché de `mem.cache` |
+
+## Estado del lenguaje
+
+[ESTADO.md](ESTADO.md) resume qué puede y qué no puede Rackituq hoy.
 
 ## Estructura
 

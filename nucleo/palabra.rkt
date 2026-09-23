@@ -24,10 +24,32 @@
 ;;     -guni     condicional ("si..."): el resto de la oración va solo si es cierta
 ;;     -gaangat  habitual ("cada vez que..."): repite el resto mientras sea cierta
 
-;; Una pieza es un elemento con sus complementos: `desde:1:3`
-(define patron-pieza
-  (pregexp (format "(?:~a)(?::(?:~a))*"
-                   (object-name patron-elemento) (object-name patron-elemento))))
+;; Los complementos pueden ser sub-palabras entre paréntesis: 5.por:(4.menos:1)
+(instalar-evaluador! (lambda (texto) (ejecutar-palabra texto)))
+
+;; Partir un texto por un carácter, sin mirar dentro de las comillas ni de los
+;; paréntesis. El punto entre dígitos es decimal, no separador: 3.5 es un número
+(define (partir texto separador)
+  (let loop ([i 0] [inicio 0] [comillas? #f] [prof 0] [acc '()])
+    (if (= i (string-length texto))
+        (reverse (cons (substring texto inicio) acc))
+        (let ([c (string-ref texto i)])
+          (cond
+            [(char=? c #\") (loop (add1 i) inicio (not comillas?) prof acc)]
+            [comillas? (loop (add1 i) inicio comillas? prof acc)]
+            [(char=? c #\() (loop (add1 i) inicio comillas? (add1 prof) acc)]
+            [(char=? c #\)) (loop (add1 i) inicio comillas? (sub1 prof) acc)]
+            [(and (zero? prof) (char=? c separador) (not (decimal? texto i separador)))
+             (loop (add1 i) (add1 i) comillas? prof (cons (substring texto inicio i) acc))]
+            [else (loop (add1 i) inicio comillas? prof acc)])))))
+
+;; ¿Este punto es el de un número decimal?
+(define (decimal? texto i separador)
+  (and (char=? separador #\.)
+       (> i 0)
+       (< (add1 i) (string-length texto))
+       (char-numeric? (string-ref texto (sub1 i)))
+       (char-numeric? (string-ref texto (add1 i)))))
 
 (define modos '(("?" . pregunta) ("-guni" . condicional) ("-gaangat" . habitual)))
 
@@ -65,19 +87,20 @@
 ;; Partir una palabra en su raíz y sus morfemas: cada morfema es (nombre . complementos)
 ;; ".sum.ar" (con punto inicial) no tiene raíz
 (define (segmentar cuerpo)
-  (let* ([piezas (regexp-match* patron-pieza cuerpo)]
+  (let* ([piezas (filter non-empty-string? (partir cuerpo #\.))]
          [sin-raiz? (string-prefix? cuerpo ".")]
          [raiz (if (or sin-raiz? (empty? piezas)) "" (first piezas))]
          [resto (if (or sin-raiz? (empty? piezas)) piezas (rest piezas))])
     (values raiz
             (unir-piezas (for/list ([p resto])
-                           (let ([elementos (regexp-match* patron-elemento p)])
+                           (let ([elementos (partir p #\:)])
                              (cons (first elementos) (rest elementos))))))))
 
 ;; ¿La raíz es un literal o una variable?
 (define (tiene-valor? raiz)
   (or (texto-literal? raiz)
       (lista-literal? raiz)
+      (sub-palabra? raiz)
       (string->number raiz)
       (hash-has-key? variables raiz)))
 
@@ -129,11 +152,19 @@
            (texto-literal? token)
            (not (string-contains? token ".")))))
 
+;; ¿La palabra lleva modo pegado al final?
+(define (tiene-modo? palabra)
+  (let-values ([(cuerpo modo) (separar-modo palabra)])
+    (not (eq? modo 'afirmacion))))
+
 ;; Agrupar los tokens en palabras con sus argumentos: ((palabra arg ...) ...)
+;; Una palabra con modo cierra su grupo: lo que sigue ya es otra palabra
 (define (agrupar tokens)
   (reverse
    (for/fold ([grupos '()]) ([t tokens])
-     (if (and (pair? grupos) (argumento? t))
+     (if (and (pair? grupos)
+              (argumento? t)
+              (not (tiene-modo? (last (first grupos)))))
          (cons (append (first grupos) (list t)) (rest grupos))
          (cons (list t) grupos)))))
 
@@ -186,18 +217,44 @@
 
 ;; ----- EXPLICAR -----
 
+;; Mostrar una palabra paso a paso y devolver su valor y su modo
+(define (explicar-grupo grupo)
+  (displayln (string-join grupo " "))
+  (let-values ([(valor modo)
+                (evaluar-palabra
+                 (first grupo) (rest grupo)
+                 #:paso (lambda (nombre complementos valor)
+                          (printf "   ~a  →  ~a\n"
+                                  (if (string=? nombre "raíz")
+                                      (format "raíz ~a" (first complementos))
+                                      (string-join (cons nombre (map texto-rackituq complementos)) ":"))
+                                  (texto-rackituq valor))))])
+    (unless (eq? modo 'afirmacion)
+      (printf "   modo ~a  →  ~a\n" modo (texto-rackituq valor)))
+    (values valor modo)))
+
+;; Mostrar una oración paso a paso, diciendo qué rama toma cada condicional
+(define (explicar-grupos grupos)
+  (unless (empty? grupos)
+    (let-values ([(valor modo) (explicar-grupo (first grupos))])
+      (case modo
+        [(condicional)
+         (let-values ([(entonces si-no) (partir-en-sino (rest grupos))])
+           (cond
+             [valor
+              (displayln "   condición cierta  →  sigue la oración")
+              (explicar-grupos entonces)]
+             [(empty? si-no)
+              (displayln "   condición falsa  →  la oración no sigue")]
+             [else
+              (displayln "   condición falsa  →  toma la rama sino")
+              (explicar-grupos si-no)]))]
+        [(habitual)
+         ;; El bucle no se repite aquí: explicar muestra una sola vuelta
+         (displayln "   modo habitual  →  se repetiría; explicar muestra una vuelta")
+         (explicar-grupos (rest grupos))]
+        [else (explicar-grupos (rest grupos))]))))
+
 ;; Mostrar una línea paso a paso: qué hace cada morfema con el valor
 (define (explicar linea)
-  (for ([grupo (agrupar (tokenizar linea))])
-    (displayln (string-join grupo " "))
-    (let-values ([(valor modo)
-                  (evaluar-palabra
-                   (first grupo) (rest grupo)
-                   #:paso (lambda (nombre complementos valor)
-                            (printf "   ~a  →  ~a\n"
-                                    (if (string=? nombre "raíz")
-                                        (format "raíz ~a" (first complementos))
-                                        (string-join (cons nombre (map texto-rackituq complementos)) ":"))
-                                    (texto-rackituq valor))))])
-      (unless (eq? modo 'afirmacion)
-        (printf "   modo ~a  →  ~a\n" modo (texto-rackituq valor))))))
+  (explicar-grupos (agrupar (tokenizar linea))))

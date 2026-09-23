@@ -1,15 +1,17 @@
 #lang racket
 
-(require "estado.rkt" "ejecutor.rkt" "palabra.rkt")
+(require "estado.rkt" "vocabulario.rkt" "ejecutor.rkt" "palabra.rkt")
 (provide (all-defined-out))
 
 ;; ----- REPL (Read-Eval-Print Loop) -----
 
-;; Argumento de un comando especial: "5" -> 5, "\"hola mundo\"" -> "hola mundo"
+;; Argumento de un comando especial: "5" -> 5, "\"hola\"" -> "hola", "1,2" -> (1 2).
+;; Un nombre suelto queda como texto, porque suele ser el nombre de una variable
 (define (leer-argumento token)
   (cond
     [(string->number token) => values]
-    [(regexp-match? #px"^\".*\"$" token) (substring token 1 (sub1 (string-length token)))]
+    [(texto-literal? token) (substring token 1 (sub1 (string-length token)))]
+    [(lista-literal? token) (resolver token)]
     [else token]))
 
 (define comandos-especiales
@@ -31,12 +33,33 @@
       ;; `explicar <línea>` muestra la palabra paso a paso
       [(string=? (first tokens) "explicar")
        (explicar (string-join (rest tokens) " "))]
+      ;; `correr <archivo>` ejecuta un programa guardado
+      [(and (string=? (first tokens) "correr") (= (length tokens) 2))
+       (correr-archivo (leer-argumento (second tokens)))]
+      ;; El cuerpo de un sufijo es todo el resto de la línea, con sus espacios
+      [(and (string=? (first tokens) "definir.sufijo") (>= (length tokens) 3))
+       (ejecutar-comando "definir.sufijo" (second tokens) (string-join (drop tokens 2) " "))]
       [(comando-especial? (first tokens))
        (let ([args (map leer-argumento (rest tokens))])
          (if (empty? args)
              (ejecutar-comando (first tokens) #f)
              (apply ejecutar-comando (first tokens) args)))]
       [else (hablar entrada)])))
+
+;; ----- PROGRAMAS EN ARCHIVO -----
+
+;; Correr un archivo .rkq: una línea por instrucción. Las líneas vacías y las
+;; que empiezan con ;; son comentarios
+(define (correr-archivo ruta)
+  (for ([linea (file->lines ruta)]
+        [numero (in-naturals 1)])
+    (let ([limpia (string-trim linea)])
+      (unless (or (string=? limpia "") (string-prefix? limpia ";;"))
+        (with-handlers ([exn:fail?
+                         (lambda (e)
+                           (error (format "~a\n   en la línea ~a: ~a" (exn-message e) numero limpia)))])
+          (ejecutar-linea limpia)))))
+  (format "Programa ~a terminado" ruta))
 
 ;; Función REPL básico para pruebas
 (define (repl)

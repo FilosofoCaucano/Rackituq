@@ -104,22 +104,34 @@
 ;; reciba el sufijo se escriben $1, $2, ... dentro de la cadena:
 ;;   (definir-sufijo "cuadrado-mas-uno" "a-la:2.mas:1")  ->  3.cuadrado-mas-uno = 10
 ;;   (definir-sufijo "aumentar-en" "mas:$1")             ->  5.aumentar-en:3 = 8
-(define (definir-sufijo nombre cadena)
-  (let ([palabra (if (string-prefix? cadena ".") cadena (string-append "." cadena))])
+;;
+;; Si el cuerpo nombra $0 (el valor que recibe el sufijo), se lee como una
+;; oración completa, así puede llevar modos y llamarse a sí mismo:
+;;   (definir-sufijo "fact" "$0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)")
+(define (definir-sufijo nombre cuerpo)
+  (let ([oracion? (string-contains? cuerpo "$0")])
     (hash-set! funciones nombre
                (lambda (v . args)
-                 (ejecutar-palabra (reemplazar-huecos palabra nombre args) #:entrada v)))
-    (format "Sufijo ~a definido como ~a" nombre cadena)))
+                 (let ([texto (reemplazar-huecos cuerpo nombre v args)])
+                   (if oracion?
+                       (hablar texto)
+                       (ejecutar-palabra (if (string-prefix? texto ".")
+                                             texto
+                                             (string-append "." texto))
+                                         #:entrada v)))))
+    (format "Sufijo ~a definido como ~a" nombre cuerpo)))
 
-;; Cambiar $1, $2, ... por los complementos que llegaron
-(define (reemplazar-huecos palabra nombre args)
-  (regexp-replace* #px"\\$([0-9]+)" palabra
+;; Cambiar $0 por el valor que recibe el sufijo, y $1, $2, ... por sus complementos
+(define (reemplazar-huecos cuerpo nombre valor args)
+  (regexp-replace* #px"\\$([0-9]+)" cuerpo
                    (lambda (todo numero)
                      (let ([i (string->number numero)])
-                       (when (> i (length args))
-                         (error (format "Error: el sufijo ~a necesita ~a complemento(s); recibió ~a"
-                                        nombre i (length args))))
-                       (texto-de-valor (list-ref args (sub1 i)))))))
+                       (cond
+                         [(zero? i) (texto-de-valor valor)]
+                         [(> i (length args))
+                          (error (format "Error: el sufijo ~a necesita ~a complemento(s); recibió ~a"
+                                         nombre i (length args)))]
+                         [else (texto-de-valor (list-ref args (sub1 i)))])))))
 
 ;; ----- DEFINICIÓN DE FUNCIONES -----
 

@@ -1,0 +1,9 @@
+;; Recursión escrita en Rackituq: el sufijo se llama a sí mismo
+definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
+
+5.fact.mostrar
+1,2,3,4,5,6.cada:fact.mostrar
+
+;; Cuenta regresiva
+definir.sufijo cuenta-atras $0.cero-guni "despegue".muestra sino $0.muestra.menos:1.cuenta-atras
+3.cuenta-atras
