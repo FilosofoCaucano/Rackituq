@@ -66,7 +66,9 @@ dentro de complementos: `cada:sumar:1`.
 |---|---|
 | Aritmética | `sum.ar`/`sumar`/`mas`, `rest.ar`/`restar`/`menos`, `mult.iplicar`/`multiplicar`/`por`, `div.idir`/`dividir`/`entre`, `pot.enciar`/`potenciar`/`a-la`, `mod.ul`/`modulo`/`mod`, `dobla`, `neg` |
 | Matemática | `raiz`, `sin.us`/`seno`, `cos.inus`/`coseno`, `tan.gente`/`tangente`, `log.aritmo`/`logaritmo`, `exp.onencial`/`exponencial`, `abs.oluto`/`absoluto`/`abs`, `rand.aleatorio`/`aleatorio`, `min.imo`/`minimo`, `max.imo`/`maximo` |
-| Listas | `lista`, `sub.lista`/`sublista`/`desde`, `conc.atenar`/`concatenar`, `ind.ice`/`indice`, `long.itud`/`longitud`/`cuenta`, `prim.ero`/`primero`, `ult.imo`/`ultimo`, `suma`, `producto`, `invierte`, `ordena`, `con` |
+| Listas | `lista`, `sub.lista`/`sublista`/`desde`, `ind.ice`/`indice`, `prim.ero`/`primero`, `ult.imo`/`ultimo`, `suma`, `producto`, `invierte`, `ordena`, `con` |
+| Texto | `texto`, `mayusculas`, `minusculas`, `recorta`, `parte:" "`, `une:"-"`, `reemplaza:viejo:nuevo` |
+| Texto y listas | `conc.atenar`/`concatenar`/`pega`, `long.itud`/`longitud`/`cuenta`, `contiene` |
 | Orden superior | `map`/`cada`, `filter`/`filtra`/`solo`, `reduce`/`junta` — su complemento es otra operación, y se pueden anidar: `cada:cada:por:2` |
 | Predicados | `par`, `impar`, `positivo`, `negativo`, `cero`, `vacia`, `mayor`, `menor`, `igual`, `distinto` |
 | Tipos y variables | `es:numero` (usa el tipo declarado si lo hay), `en:nombre`/`guarda:nombre` (guarda el valor y lo deja seguir) |
@@ -79,6 +81,14 @@ Una cadena de morfemas se puede guardar como un sufijo nuevo:
 ```
 definir.sufijo cuadrado a-la:2
 1,2,3.cada:cuadrado          → (1 4 9)
+```
+
+El sufijo puede tener sus propios complementos. Se escriben `$1`, `$2`:
+
+```
+definir.sufijo aumentar-en mas:$1
+5.aumentar-en:3              → 8
+1,2,3.cada:aumentar-en:10    → (11 12 13)
 ```
 
 Las funciones definidas con `definir.funcion` y `definir.funcion.recursiva`

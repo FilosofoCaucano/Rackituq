@@ -90,13 +90,33 @@
 
 ;; ----- DEFINICIÓN DE SUFIJOS -----
 
-;; Guardar una cadena de morfemas como un sufijo nuevo:
-;; (definir-sufijo "cuadrado-mas-uno" "a-la:2.mas:1")  ->  3.cuadrado-mas-uno = 10
+;; Cómo se escribe un valor para volver a meterlo en una palabra
+(define (texto-de-valor v)
+  (cond
+    [(string? v) (format "~s" v)]
+    [(list? v) (string-join (map (lambda (x) (format "~a" x)) v) ",")]
+    [else (format "~a" v)]))
+
+;; Guardar una cadena de morfemas como un sufijo nuevo. Los complementos que
+;; reciba el sufijo se escriben $1, $2, ... dentro de la cadena:
+;;   (definir-sufijo "cuadrado-mas-uno" "a-la:2.mas:1")  ->  3.cuadrado-mas-uno = 10
+;;   (definir-sufijo "aumentar-en" "mas:$1")             ->  5.aumentar-en:3 = 8
 (define (definir-sufijo nombre cadena)
   (let ([palabra (if (string-prefix? cadena ".") cadena (string-append "." cadena))])
     (hash-set! funciones nombre
-               (lambda (v . _) (ejecutar-palabra palabra #:entrada v)))
+               (lambda (v . args)
+                 (ejecutar-palabra (reemplazar-huecos palabra nombre args) #:entrada v)))
     (format "Sufijo ~a definido como ~a" nombre cadena)))
+
+;; Cambiar $1, $2, ... por los complementos que llegaron
+(define (reemplazar-huecos palabra nombre args)
+  (regexp-replace* #px"\\$([0-9]+)" palabra
+                   (lambda (todo numero)
+                     (let ([i (string->number numero)])
+                       (when (> i (length args))
+                         (error (format "Error: el sufijo ~a necesita ~a complemento(s); recibió ~a"
+                                        nombre i (length args))))
+                       (texto-de-valor (list-ref args (sub1 i)))))))
 
 ;; ----- DEFINICIÓN DE FUNCIONES -----
 

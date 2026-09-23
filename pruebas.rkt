@@ -123,6 +123,26 @@
   (check-equal? (ejecutar-linea "definir.sufijo p-triple por:3") "Sufijo p-triple definido como por:3")
   (check-equal? (hablar "4.p-triple.p-triple") 36))
 
+(test-case "sufijos con complementos propios"
+  (ejecutar-comando "definir.sufijo" "p-aumentar-en" "mas:$1")
+  (check-equal? (hablar "5.p-aumentar-en:3") 8)
+  (check-equal? (hablar "1,2,3.cada:p-aumentar-en:10") '(11 12 13))
+  (ejecutar-comando "definir.sufijo" "p-escala" "por:$1.mas:$2")
+  (check-equal? (hablar "10.p-escala:3:1") 31)
+  (check-exn #rx"necesita 1 complemento" (lambda () (hablar "5.p-aumentar-en"))))
+
+(test-case "morfemas de texto"
+  (check-equal? (hablar "\"hola \".concatenar:\"mundo\".mayusculas") "HOLA MUNDO")
+  (check-equal? (hablar "\"hola mundo\".parte.cada:mayusculas.une:\"-\"") "HOLA-MUNDO")
+  (check-equal? (hablar "\"hola mundo\".reemplaza:\"mundo\":\"tierra\"") "hola tierra")
+  (check-equal? (hablar "\"  hola  \".recorta.cuenta") 4)
+  (check-equal? (hablar "5.texto.concatenar:\" gatos\"") "5 gatos")
+  (check-equal? (hablar "1,2,3.une:\" + \"") "1 + 2 + 3")
+  (check-equal? (hablar "\"hola mundo\".contiene:\"mundo\"?") "sí")
+  ;; los morfemas de lista siguen funcionando con listas
+  (check-equal? (hablar "1,2,3.concatenar:4,5") '(1 2 3 4 5))
+  (check-equal? (hablar "1,2,3.cuenta") 3))
+
 (test-case "errores claros"
   (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "banana.suma")))
   (check-exn #rx"No conozco el sufijo volar" (lambda () (hablar "5.volar")))

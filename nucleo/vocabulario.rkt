@@ -122,10 +122,14 @@
 ;; ----- LISTAS -----
 (definir-morfema '("lista")                          'valor (lambda (v . ns) (cons v ns)))
 (definir-morfema '("sub.lista" "sublista" "desde")   'valor (lambda (l i j) (take (drop l i) (- j i))))
-(definir-morfema '("conc.atenar" "concatenar")       'valor append)
+;; Sirve para listas y para textos: "hola ".concatenar:"mundo"
+(definir-morfema '("conc.atenar" "concatenar" "pega") 'valor
+  (lambda (v . resto)
+    (if (string? v) (apply string-append v (map texto-rackituq resto)) (apply append v resto))))
 (definir-morfema '("ind.ice" "indice")               'valor
   (lambda (l [i 0]) (list-ref l (if (number? i) i 0))))
-(definir-morfema '("long.itud" "longitud" "cuenta")  'valor length)
+(definir-morfema '("long.itud" "longitud" "cuenta")  'valor
+  (lambda (v) (if (string? v) (string-length v) (length v))))
 (definir-morfema '("prim.ero" "primero")             'valor first)
 (definir-morfema '("ult.imo" "ultimo")               'valor last)
 (definir-morfema '("suma")                           'valor (lambda (l) (apply + l)))
@@ -133,6 +137,22 @@
 (definir-morfema '("invierte")                       'valor reverse)
 (definir-morfema '("ordena")                         'valor (lambda (l) (sort l <)))
 (definir-morfema '("con")                            'valor (lambda (l x) (append l (list x))))
+
+;; ----- TEXTO -----
+(definir-morfema '("texto")                  'valor texto-rackituq)
+(definir-morfema '("mayusculas")             'valor string-upcase)
+(definir-morfema '("minusculas")             'valor string-downcase)
+(definir-morfema '("recorta")                'valor string-trim)
+;; "hola mundo".parte:" " -> ("hola" "mundo");  sin complemento parte por espacios
+(definir-morfema '("parte")                  'valor
+  (lambda (v [sep " "]) (string-split v sep)))
+;; ("hola" "mundo").une:" " -> "hola mundo"
+(definir-morfema '("une")                    'valor
+  (lambda (l [sep " "]) (string-join (map texto-rackituq l) sep)))
+(definir-morfema '("contiene")               'valor
+  (lambda (v x) (if (string? v) (string-contains? v x) (and (member x v) #t))))
+(definir-morfema '("reemplaza")              'valor
+  (lambda (v viejo nuevo) (string-replace v viejo nuevo)))
 
 ;; ----- ORDEN SUPERIOR: su complemento es otra operación -----
 ;; `cada:por:10`, `solo:mayor:2`, `junta:mas`; se pueden anidar: `cada:solo:par`
