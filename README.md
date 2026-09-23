@@ -158,8 +158,10 @@ Estos no son palabras sino comandos con argumentos separados por espacios:
 ## Estructura
 
 ```
-Lengua Rackituq.rkt     punto de entrada y demo
+Lengua Rackituq.rkt     punto de entrada: la demo, o corre un .rkq
 pruebas.rkt             pruebas (raco test pruebas.rkt)
+ESTADO.md               qué puede y qué no puede el lenguaje hoy
+ejemplos/               programas .rkq
 nucleo/
   vocabulario.rkt       el diccionario de morfemas: aquí se agregan morfemas nuevos
   palabra.rkt           el segmentador: parte palabras y oraciones y las evalúa
@@ -169,7 +171,7 @@ nucleo/
   condiciones.rkt       comparaciones de si/mientras
   io.rkt                entrada y salida
   estado.rkt            las tablas globales
-  repl.rkt              el REPL
+  repl.rkt              el REPL, explicar y correr archivos
 ```
 
 ### Agregar un morfema
