@@ -122,6 +122,7 @@
     [(number? valor) 'numero]
     [(string? valor) 'texto]
     [(list? valor) 'lista]
+    [(hash? valor) 'diccionario]
     [(boolean? valor) 'booleano]
     [(procedure? valor) 'funcion]
     [else 'desconocido]))

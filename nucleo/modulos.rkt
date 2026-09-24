@@ -80,8 +80,9 @@
 ;; módulo la variable se actualiza en vez de chocar con la que ya existe
 (define (linea-de-variable nombre valor)
   (cond
-    [(and (list? valor) (empty? valor))
-     (format ";; ~a es una lista vacía: todavía no hay forma de escribirla" nombre)]
+    [(or (and (list? valor) (empty? valor))
+         (and (hash? valor) (zero? (hash-count valor))))
+     (format ";; ~a está vacío: todavía no hay forma de escribirlo" nombre)]
     ;; Una lista de un solo elemento necesita .lista, o se leería como el valor suelto
     [(and (list? valor) (= (length valor) 1))
      (format "~a.lista.en:~a" (texto-de-valor (first valor)) nombre)]

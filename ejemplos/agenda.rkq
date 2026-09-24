@@ -1,0 +1,18 @@
+;; Diccionarios: pares nombre/valor
+
+"ana",30,"luis",25,"eva",41.diccionario.en:edades
+
+edades.muestra
+edades.cuenta.texto.concatenar:" personas en la agenda".mostrar
+edades.valor-de:"ana".texto.concatenar:" años tiene ana".mostrar
+edades.valores.promedio.decimal.texto.concatenar:" es el promedio".mostrar
+
+;; Quién es mayor de 28
+edades.claves.solo:(edades.valor-de:esto.mayor:28).une:" y ".mostrar
+
+;; Agregar y quitar arman un diccionario nuevo
+edades.pon:"pepe":19.claves.mostrar
+edades.quita:"luis".claves.mostrar
+
+;; Si la clave no está, se puede atajar el error
+edades.intenta:(valor-de:"pepe"):("pepe no está en la agenda").mostrar

@@ -309,6 +309,47 @@
   (check-equal? (hablar "p-saludo") "hola")
   (delete-file archivo))
 
+(test-case "leer del teclado dentro de una palabra"
+  (parameterize ([current-input-port (open-input-string "William\n30\n")])
+    (check-equal? (salida-de (lambda () (hablar "\"¿Nombre? \".lee.en:p-nom"))) "¿Nombre? ")
+    (check-equal? (hablar "p-nom") "William")
+    (salida-de (lambda () (hablar "\"¿Edad? \".lee.numero.en:p-ed")))
+    (check-equal? (hablar "p-ed") 30)
+    (check-equal? (hablar "p-ed.mayor:17?") "sí"))
+  (check-exn #rx"no es un número" (lambda () (hablar "\"doce\".numero"))))
+
+(test-case "diccionarios"
+  (hablar "\"ana\",30,\"luis\",25.diccionario.en:p-edades")
+  (check-equal? (hablar "p-edades.valor-de:\"ana\"") 30)
+  (check-equal? (hablar "p-edades.cuenta") 2)
+  (check-equal? (hablar "p-edades.claves") '("ana" "luis"))
+  (check-equal? (hablar "p-edades.valores") '(30 25))
+  (check-equal? (hablar "p-edades.contiene:\"luis\"?") "sí")
+  (check-equal? (hablar "p-edades.contiene:\"pepe\"?") "no")
+  (check-equal? (hablar "p-edades.pon:\"eva\":41.cuenta") 3)
+  (check-equal? (hablar "p-edades.quita:\"luis\".claves") '("ana"))
+  (check-equal? (hablar "p-edades.valores.promedio.decimal") 27.5)
+  (check-equal? (hablar "p-edades.es:diccionario?") "sí")
+  ;; se muestra como {clave: valor}
+  (check-equal? (salida-de (lambda () (hablar "p-edades.muestra"))) "{ana: 30, luis: 25}\n")
+  (check-exn #rx"no tiene" (lambda () (hablar "p-edades.valor-de:\"pepe\"")))
+  (check-equal? (hablar "p-edades.intenta:(valor-de:\"pepe\"):(\"no está\")") "no está")
+  (check-exn #rx"pares de clave y valor" (lambda () (hablar "\"a\",1,\"b\".diccionario"))))
+
+(test-case "un diccionario se guarda y se recarga"
+  (define archivo (make-temporary-file "rackituq-~a.rkq"))
+  (hablar "\"ana\",30.diccionario.en:p-dic")
+  (ejecutar-comando "exportar.modulo" '("p-dic") archivo)
+  (hash-remove! variables "p-dic")
+  (ejecutar-comando "importar.modulo" archivo)
+  (check-equal? (hablar "p-dic.valor-de:\"ana\"") 30)
+  (delete-file archivo))
+
+(test-case "un complemento del sufijo puede ser la operación"
+  (ejecutar-linea "definir.sufijo p-a-todos cada:$1")
+  (check-equal? (hablar "1,2,3.p-a-todos:dobla") '(2 4 6))
+  (check-exn #rx"necesita 1 complemento" (lambda () (hablar "1,2,3.p-a-todos"))))
+
 (test-case "errores claros"
   (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "banana.suma")))
   (check-exn #rx"No conozco el sufijo volar" (lambda () (hablar "5.volar")))

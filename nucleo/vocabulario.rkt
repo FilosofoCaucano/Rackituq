@@ -121,8 +121,19 @@
              (apply (morfema-proc m) valor (map resolver-valor complementos))]))]
     ;; Las funciones que define el usuario también se pegan como morfemas
     [(hash-ref funciones nombre #f)
-     => (lambda (f) (apply f valor (map resolver-valor complementos)))]
+     => (lambda (f) (apply f valor (map resolver-complemento complementos)))]
     [else (error (format "Error: No conozco el sufijo ~a" nombre))]))
+
+;; Un sufijo del usuario puede recibir el nombre de otra operación como
+;; complemento (`1,2,3.a-todos:dobla`): ese nombre se pasa tal cual
+(define (resolver-complemento x)
+  (if (and (string? x)
+           (not (variable-existe? x))
+           (or (sub-palabra? x)
+               (buscar-morfema (string-trim x "." #:right? #f))
+               (hash-has-key? funciones x)))
+      x
+      (resolver-valor x)))
 
 ;; La operación que reciben cada/solo/junta: un procedimiento de Racket,
 ;; o el nombre de un morfema o función (".sum.ar", "por", "cuadrado")
@@ -131,6 +142,9 @@
     [(procedure? op) (apply op valor (map resolver-valor extras))]
     ;; Una cadena entre paréntesis se aplica al valor: cada:(mas:1.por:2)
     [(sub-palabra? op) ((unbox encadenador) (interior op) valor extras)]
+    ;; La operación puede venir en una variable, por ejemplo el $1 de un sufijo
+    [(and (string? op) (variable-existe? op))
+     (aplicar-operacion (obtener-variable op) valor extras)]
     [else (aplicar-morfema valor (string-trim op "." #:right? #f) extras)]))
 
 ;; Cómo se escribe un valor para volver a meterlo en una palabra
@@ -140,6 +154,13 @@
     [(eq? v #t) "sí"]
     [(eq? v #f) "no"]
     [(list? v) (string-join (map texto-de-valor v) ",")]
+    ;; un diccionario se escribe como la lista de pares que lo arma
+    [(hash? v)
+     (format "~a.diccionario"
+             (string-join (for*/list ([k (ordenar-claves v)]
+                                      [x (list k (hash-ref v k))])
+                            (texto-de-valor x))
+                          ","))]
     [else (format "~a" v)]))
 
 ;; Cómo se lee un valor en Rackituq: los booleanos son sí/no
@@ -147,6 +168,12 @@
   (cond
     [(eq? v #t) "sí"]
     [(eq? v #f) "no"]
+    ;; un diccionario se lee {ana: 30, luis: 25}
+    [(hash? v)
+     (format "{~a}"
+             (string-join (for/list ([k (ordenar-claves v)])
+                            (format "~a: ~a" (texto-rackituq k) (texto-rackituq (hash-ref v k))))
+                          ", "))]
     [else (format "~a" v)]))
 
 ;; Namespace para las lambdas que se arman en tiempo de ejecución
@@ -193,7 +220,11 @@
     (let ([n (if (number? i) i 0)])
       (if (string? l) (substring l n (add1 n)) (list-ref l n)))))
 (definir-morfema '("long.itud" "longitud" "cuenta")  'valor
-  (lambda (v) (if (string? v) (string-length v) (length v))))
+  (lambda (v)
+    (cond
+      [(string? v) (string-length v)]
+      [(hash? v) (hash-count v)]
+      [else (length v)])))
 ;; Sirven para listas y para textos
 (definir-morfema '("prim.ero" "primero")             'valor
   (lambda (v) (if (string? v) (substring v 0 1) (first v))))
@@ -227,9 +258,35 @@
 (definir-morfema '("une")                    'valor
   (lambda (l [sep " "]) (string-join (map texto-rackituq l) sep)))
 (definir-morfema '("contiene")               'valor
-  (lambda (v x) (if (string? v) (string-contains? v x) (and (member x v) #t))))
+  (lambda (v x)
+    (cond
+      [(string? v) (string-contains? v x)]
+      ;; en un diccionario pregunta por la clave
+      [(hash? v) (hash-has-key? v x)]
+      [else (and (member x v) #t)])))
 (definir-morfema '("reemplaza")              'valor
   (lambda (v viejo nuevo) (string-replace v viejo nuevo)))
+
+;; ----- DICCIONARIOS -----
+;; Pares nombre/valor. Se arman desde una lista que alterna clave y valor:
+;;   "ana",30,"luis",25.diccionario
+(definir-morfema '("diccionario" "dicc") 'valor
+  (lambda (l)
+    (when (odd? (length l))
+      (error "Error: un diccionario necesita pares de clave y valor"))
+    (apply hash l)))
+(definir-morfema '("pon")     'valor (lambda (d clave valor) (hash-set d clave valor)))
+(definir-morfema '("quita")   'valor (lambda (d clave) (hash-remove d clave)))
+(definir-morfema '("valor-de" "saca") 'valor
+  (lambda (d clave)
+    (hash-ref d clave (lambda () (error (format "Error: el diccionario no tiene ~s" clave))))))
+(definir-morfema '("claves")  'valor (lambda (d) (ordenar-claves d)))
+(definir-morfema '("valores") 'valor
+  (lambda (d) (map (lambda (k) (hash-ref d k)) (ordenar-claves d))))
+
+;; Las claves salen siempre en el mismo orden, para que el resultado no cambie
+(define (ordenar-claves d)
+  (sort (hash-keys d) string<? #:key (lambda (k) (format "~a" k))))
 
 ;; ----- ORDEN SUPERIOR: su complemento es otra operación -----
 ;; `cada:por:10`, `solo:mayor:2`, `junta:mas`; se pueden anidar: `cada:solo:par`
@@ -267,7 +324,12 @@
 (definir-morfema '("positivo") 'valor positive?)
 (definir-morfema '("negativo") 'valor negative?)
 (definir-morfema '("cero")     'valor zero?)
-(definir-morfema '("vacia")    'valor empty?)
+(definir-morfema '("vacia")    'valor
+  (lambda (v)
+    (cond
+      [(string? v) (string=? v "")]
+      [(hash? v) (zero? (hash-count v))]
+      [else (empty? v)])))
 (definir-morfema '("mayor")    'valor (lambda (v n) (> v n)))
 (definir-morfema '("menor")    'valor (lambda (v n) (< v n)))
 (definir-morfema '("igual")    'valor (lambda (v n) (equal? v n)))
@@ -324,6 +386,23 @@
           (hash-set! memoria-cache key result)
           result))))
 (definir-morfema '("mem.limpiar") 'valor (lambda (v . _) (hash-clear! memoria-cache)))
+
+;; ----- ENTRADA -----
+;; `"¿Cómo te llamás?".lee` escribe la pregunta y devuelve lo que se teclee
+(definir-morfema '("lee" "pregunta") 'valor
+  (lambda (v)
+    (display (texto-rackituq v))
+    (flush-output)
+    (let ([linea (read-line)])
+      (if (eof-object? linea) "" linea))))
+
+;; `.numero` convierte un texto en número: "12".numero -> 12
+(definir-morfema '("numero") 'valor
+  (lambda (v)
+    (if (number? v)
+        v
+        (or (string->number (string-trim v))
+            (error (format "Error: ~s no es un número" v))))))
 
 ;; ----- SALIDA -----
 (definir-morfema '("muestra" "mostrar") 'valor

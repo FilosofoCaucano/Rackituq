@@ -108,6 +108,8 @@ dentro de complementos: `cada:sumar:1`.
 | Texto | `texto`, `mayusculas`, `minusculas`, `recorta`, `parte:" "` (con `""` parte en letras), `une:"-"`, `reemplaza:viejo:nuevo`, `letra:0`, `trozo:0:4` |
 | Texto y listas | `conc.atenar`/`concatenar`/`pega`, `long.itud`/`longitud`/`cuenta`, `contiene`, `ind.ice`/`indice`, `prim.ero`/`primero`, `ult.imo`/`ultimo`, `invierte` |
 | Errores | `intenta:(cadena)` y `intenta:(cadena):(respaldo)`, `falla:"mensaje"` |
+| Diccionarios | `diccionario`/`dicc`, `pon:clave:valor`, `quita:clave`, `valor-de:clave`/`saca:clave`, `claves`, `valores` (y `cuenta`, `contiene`, `vacia` también sirven) |
+| Entrada | `lee`/`pregunta` (escribe la pregunta y devuelve lo tecleado), `numero` (texto a número) |
 | Orden superior | `map`/`cada`, `filter`/`filtra`/`solo`, `reduce`/`junta` — su complemento es otra operación, y se pueden anidar: `cada:cada:por:2` |
 | Predicados | `par`, `impar`, `positivo`, `negativo`, `cero`, `vacia`, `mayor`, `menor`, `igual`, `distinto` |
 | Condiciones | `y`, `o`, `no`/`niega` — el complemento suele ser una sub-palabra: `edad.mayor:17.y:(edad.menor:65)`. `y` y `o` son de corto circuito |
@@ -169,6 +171,33 @@ definir.sufijo acumular $0.mas:total.global:total
 5.acumular                   → 5
 7.acumular                   → 12
 ```
+
+## Diccionarios
+
+Pares nombre/valor. Se arman desde una lista que alterna clave y valor:
+
+```
+"ana",30,"luis",25.diccionario.en:edades
+edades.valor-de:"ana"                            → 30
+edades.pon:"eva":41.claves                       → ("ana" "eva" "luis")
+edades.claves.solo:(edades.valor-de:esto.mayor:28).une:" y "   → "ana y eva"
+edades.muestra                                   → {ana: 30, luis: 25}
+```
+
+Agregar o quitar arma un diccionario nuevo; el original no cambia. Hay un
+ejemplo en [ejemplos/agenda.rkq](ejemplos/agenda.rkq).
+
+## Preguntarle al que usa el programa
+
+```
+"¿Cómo te llamás? ".lee.en:nombre
+"¿Cuántos años tenés? ".lee.numero.en:edad
+edad.mayor:17-guni "Ya sos mayor de edad".muestra sino "Todavía no".muestra
+```
+
+La raíz es la pregunta que se escribe en pantalla, y `lee` devuelve lo que se
+teclee. `numero` convierte ese texto en número. Ejemplo completo en
+[ejemplos/preguntas.rkq](ejemplos/preguntas.rkq).
 
 ## Bibliotecas
 

@@ -1,0 +1,9 @@
+;; Este programa pide datos por teclado. Correlo así:
+;;   racket "Lengua Rackituq.rkt" ejemplos/preguntas.rkq
+
+"¿Cómo te llamás? ".lee.en:nombre
+"¿Cuántos años tenés? ".lee.numero.en:edad
+
+"Hola ".concatenar:nombre.concatenar:"!".mostrar
+edad.mayor:17-guni "Ya sos mayor de edad".muestra sino "Todavía no".muestra
+edad.mas:10.texto.concatenar:" años vas a tener en 10 años".mostrar

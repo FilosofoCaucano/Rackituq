@@ -2,7 +2,7 @@
 
 Estado al 23 de septiembre de 2026. Todo lo que dice este documento está
 probado corriendo el código, no leyéndolo. Las pruebas (`raco test pruebas.rkt`)
-son 38 y pasan.
+son 42 y pasan.
 
 Rackituq es un lenguaje aglutinante: un programa puede ser **una sola palabra**,
 armada pegándole sufijos a una raíz, como en kalaallisut (groenlandés).
@@ -19,8 +19,9 @@ El corazón del lenguaje. Cada morfema transforma lo que venía antes.
 "hola mundo".parte.cada:mayusculas.une:"-"  → "HOLA-MUNDO"
 ```
 
-Hay unos 70 morfemas: aritmética, matemática, listas, texto, predicados,
-orden superior, tipos y salida. Cada uno tiene su nombre clásico con punto
+Hay 81 morfemas (124 nombres contando los alias): aritmética, matemática,
+listas, texto, diccionarios, predicados, orden superior, entrada, salida y
+tipos. Cada uno tiene su nombre clásico con punto
 (`sum.ar`) y alias sin punto (`sumar`, `mas`), que son el mismo morfema.
 
 ### Valores
@@ -110,6 +111,24 @@ sirven igual para textos y para listas.
 0.falla:"división entre cero"                → corta con ese error
 ```
 
+### Diccionarios
+```
+"ana",30,"luis",25.diccionario.en:edades
+edades.valor-de:"ana"                        → 30
+edades.pon:"eva":41.claves                   → ("ana" "eva" "luis")
+edades.muestra                               → {ana: 30, luis: 25}
+```
+Agregar o quitar arma un diccionario nuevo. `cuenta`, `contiene` y `vacia`
+también sirven con diccionarios, y `es:diccionario?` los reconoce.
+
+### Pedir datos por teclado
+```
+"¿Cómo te llamás? ".lee.en:nombre
+"¿Cuántos años tenés? ".lee.numero.en:edad
+```
+La raíz es la pregunta que aparece en pantalla y `lee` devuelve lo tecleado;
+`numero` lo convierte en número.
+
 ### Bibliotecas propias
 Los sufijos se guardan con su cuerpo, así que `exportar.modulo todo mi.rkq`
 escribe una biblioteca **que es un programa Rackituq normal**, legible y
@@ -159,30 +178,28 @@ mirar los paréntesis.
 - Los módulos guardan variables y sufijos, pero no las funciones hechas en
   Racket, que no tienen forma de texto.
 
-### 3. Las listas no se modifican en su lugar
+### 3. Nada se modifica en su lugar
 No hay forma de cambiar el elemento 2 de una lista: siempre se arma una nueva.
+Con los diccionarios pasa lo mismo, aunque ahí casi no molesta.
 
-### 4. No hay diccionarios ni estructuras propias
-Solo números, textos, listas y sí/no. No se pueden definir tipos nuevos.
+### 4. No se pueden definir tipos propios
+Hay números, textos, listas, diccionarios y sí/no, pero no se puede inventar
+un tipo nuevo con sus propios morfemas.
 
-### 5. La entrada de usuario es solo clásica
-`leer.input` funciona como comando, pero no hay un morfema que lea del
-teclado dentro de una palabra.
+### 5. Los tipos son mínimos
+Seis tipos (`numero`, `texto`, `lista`, `diccionario`, `booleano`, `funcion`),
+y solo se revisan en variables declaradas con `definir.variable.tipo`. Los
+morfemas y los sufijos no declaran qué reciben ni qué devuelven: un error de
+tipo aparece recién al correr.
 
-### 6. Los tipos son mínimos
-Cinco tipos (`numero`, `texto`, `lista`, `booleano`, `funcion`), y solo se
-revisan en variables declaradas con `definir.variable.tipo`. Los morfemas y
-los sufijos no declaran qué reciben ni qué devuelven: un error de tipo
-aparece recién al correr.
-
-### 7. Rendimiento de la recursión
-Cada llamada recursiva reemplaza `$0` por el valor y vuelve a analizar el
-texto. Hoy `fib 22` tarda unos 0,8 segundos (antes de optimizar tardaba 33).
-Sirve para aprender y para programas chicos, no para cálculo pesado. Tampoco
-hay optimización de llamada final, así que una recursión muy profunda puede
+### 6. Rendimiento de la recursión
+`fib 22` tarda unos 0,4 segundos. Viene bajando (33 s → 0,8 s → 0,4 s), pero
+sigue siendo un lenguaje para aprender y para programas chicos, no para
+cálculo pesado. Cada llamada abre un ámbito y arma su oración, y no hay
+optimización de llamada final, así que una recursión muy profunda puede
 agotar la memoria.
 
-### 8. Dos estilos conviviendo
+### 7. Dos estilos conviviendo
 El estilo clásico (`x.sum.ar 2 3`) y el aglutinante usan el mismo motor, pero
 la regla que los distingue en el REPL tiene bordes raros: si existe una
 variable llamada `x`, `x.sum.ar 2 3` usa su valor en vez de tomar el 2 como
@@ -194,7 +211,7 @@ entrada.
 
 ```
 Lengua Rackituq.rkt     punto de entrada: demo o corre un .rkq
-pruebas.rkt             38 pruebas
+pruebas.rkt             42 pruebas
 ejemplos/               programas .rkq
 nucleo/
   vocabulario.rkt       el diccionario de morfemas (aquí se agregan nuevos)
@@ -219,10 +236,10 @@ nuevo es agregar una línea, no una rama más en un `cond`.
 
 En el orden en que más destraban el lenguaje:
 
-1. **Un morfema para leer del teclado**, para que un programa pueda pedir
-   datos sin salir del estilo aglutinante.
-2. **Diccionarios** (pares nombre/valor), que hoy no existen.
-3. **Sub-palabras con espacios**, hoy imposibles.
-4. **Acelerar la recursión de verdad**: guardar el cuerpo del sufijo ya
-   analizado y meterle los valores, en vez de rehacer el texto en cada llamada.
-5. **Tipos en los morfemas**, para avisar antes de correr.
+1. **Sub-palabras con espacios**, hoy imposibles.
+2. **Poder cambiar un elemento** de una lista o un diccionario en su lugar.
+3. **Tipos en los morfemas**, para avisar antes de correr y no al fallar.
+4. **Una sola forma de escribir**: hoy conviven el estilo clásico y el
+   aglutinante, con una regla de desempate que tiene bordes raros.
+5. **Más velocidad**: la recursión ya bajó a 0,4 s en `fib 22`, pero cada
+   llamada todavía abre un ámbito y arma su oración.

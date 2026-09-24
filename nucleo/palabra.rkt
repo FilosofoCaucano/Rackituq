@@ -251,9 +251,20 @@
 (define (tokenizar linea)
   (regexp-match* #px"(?:\"[^\"]*\"|[^\\s\"])+" linea))
 
+;; El armado de la oración también se guarda: el cuerpo de un sufijo es
+;; siempre el mismo texto, así que en una recursión se arma una sola vez
+(define cache-oraciones (make-hash))
+
+(define (grupos-de oracion)
+  (or (hash-ref cache-oraciones oracion #f)
+      (let ([grupos (agrupar (tokenizar oracion))])
+        (when (< (hash-count cache-oraciones) limite-cache)
+          (hash-set! cache-oraciones oracion grupos))
+        grupos)))
+
 ;; Punto de entrada: una línea de Rackituq
 (define (hablar oracion)
-  (evaluar-oracion (agrupar (tokenizar oracion))))
+  (evaluar-oracion (grupos-de oracion)))
 
 ;; ----- EXPLICAR -----
 

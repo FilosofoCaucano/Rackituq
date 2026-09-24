@@ -106,38 +106,38 @@
   ;; con otra cosa (una raíz, una variable, $0) es una oración completa
   (let* ([cadena? (and (not (string-contains? cuerpo "$0"))
                        (empieza-con-morfema? cuerpo))]
-         [oracion? (not cadena?)])
+         [oracion? (not cadena?)]
+         [texto (if (or cadena? (string-prefix? cuerpo ".")) (string-append "." cuerpo) cuerpo)]
+         [huecos (huecos-necesarios cuerpo)])
     ;; El cuerpo se guarda en texto para poder exportarlo a un módulo
     (hash-set! sufijos nombre cuerpo)
     (hash-set! funciones nombre
                (lambda (v . args)
-                 (let ([texto (reemplazar-huecos cuerpo nombre v args)])
-                   ;; Cada llamada tiene su propio ámbito: lo que guarde con
-                   ;; `en:` no pisa al de las otras llamadas
-                   (con-ambito-nuevo
-                    (lambda ()
-                      (if oracion?
-                          (hablar texto)
-                          (ejecutar-palabra (if (string-prefix? texto ".")
-                                                texto
-                                                (string-append "." texto))
-                                            #:entrada v)))))))
+                 (when (< (length args) huecos)
+                   (error (format "Error: el sufijo ~a necesita ~a complemento(s); recibió ~a"
+                                  nombre huecos (length args))))
+                 ;; Cada llamada tiene su propio ámbito: lo que guarde con
+                 ;; `en:` no pisa al de las otras llamadas
+                 (con-ambito-nuevo
+                  (lambda ()
+                    ;; $0 es el valor que llega y $1, $2... los complementos.
+                    ;; Van como variables locales, no reemplazando el texto: así
+                    ;; la palabra es siempre la misma y no se vuelve a analizar
+                    (definir-local "$0" v)
+                    (for ([a args] [i (in-naturals 1)])
+                      (definir-local (format "$~a" i) a))
+                    (if oracion?
+                        (hablar texto)
+                        (ejecutar-palabra texto #:entrada v))))))
     (format "Sufijo ~a definido como ~a" nombre cuerpo)))
+
+;; Cuántos complementos ($1, $2, ...) nombra el cuerpo
+(define (huecos-necesarios cuerpo)
+  (for/fold ([m 0]) ([hueco (regexp-match* #px"\\$([0-9]+)" cuerpo #:match-select second)])
+    (max m (string->number hueco))))
 
 ;; Así un módulo puede volver a definir los sufijos que guardó
 (instalar-definidor-de-sufijos! definir-sufijo)
-
-;; Cambiar $0 por el valor que recibe el sufijo, y $1, $2, ... por sus complementos
-(define (reemplazar-huecos cuerpo nombre valor args)
-  (regexp-replace* #px"\\$([0-9]+)" cuerpo
-                   (lambda (todo numero)
-                     (let ([i (string->number numero)])
-                       (cond
-                         [(zero? i) (texto-de-valor valor)]
-                         [(> i (length args))
-                          (error (format "Error: el sufijo ~a necesita ~a complemento(s); recibió ~a"
-                                         nombre i (length args)))]
-                         [else (texto-de-valor (list-ref args (sub1 i)))])))))
 
 ;; ----- DEFINICIÓN DE FUNCIONES -----
 
