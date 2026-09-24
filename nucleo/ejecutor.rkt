@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt")
+(require "errores.rkt" "estado.rkt")
 (require "variables.rkt")
 (require "modulos.rkt")
 (require "condiciones.rkt")
@@ -42,7 +42,7 @@
      (let ([func (hash-ref funciones comando)])
        (if (procedure? func)
            (func (resolver-valor x))
-           "Error: La función no es válida"))]
+           (error-funcion-invalida comando)))]
     
     ;; Estructuras de control: la operación se aplica al valor de la variable
     [(string=? comando "si")
@@ -58,7 +58,7 @@
        (cond
          [(not (evaluar-condicion (obtener-variable x) operador y)) "Bucle terminado"]
          [(>= vueltas limite-repeticiones)
-          (error (format "Error: mientras dio demasiadas vueltas; ¿el cuerpo guarda el nuevo valor en ~a?" x))]
+          (error-vueltas-mientras x)]
          [else
           (ejecutar-palabra operacion (sin-vacios-al-final (list param))
                             #:entrada (obtener-variable x))
@@ -114,8 +114,7 @@
     (hash-set! funciones nombre
                (lambda (v . args)
                  (when (< (length args) huecos)
-                   (error (format "Error: el sufijo ~a necesita ~a complemento(s); recibió ~a"
-                                  nombre huecos (length args))))
+                   (error-complementos-sufijo nombre huecos (length args)))
                  ;; Cada llamada tiene su propio ámbito: lo que guarde con
                  ;; `en:` no pisa al de las otras llamadas
                  (con-ambito-nuevo
@@ -177,7 +176,7 @@
      (hash-ref env expr
                (lambda ()
                  (namespace-variable-value expr #t
-                                           (lambda () (error (format "Error: No conozco ~a" expr)))
+                                           (lambda () (error-nombre-racket expr))
                                            ns-base)))]
     ;; `if` es forma especial: solo se evalúa la rama elegida (si no, la recursión nunca termina)
     [(and (pair? expr) (eq? (car expr) 'if))

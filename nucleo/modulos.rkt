@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt" "vocabulario.rkt")
+(require "errores.rkt" "estado.rkt" "vocabulario.rkt")
 (provide (all-defined-out))
 
 ;; ----- SOPORTE PARA MÓDULOS -----
@@ -19,7 +19,7 @@
 (define (importar-modulo ruta)
   (cond
     [(not (file-exists? ruta))
-     (format "Error: No se pudo encontrar el módulo ~a" ruta)]
+     (error-modulo-no-encontrado ruta)]
     [(formato-racket? ruta) (importar-modulo-racket ruta)]
     [else
      (let ([correr (unbox ejecutor-de-lineas)]
@@ -74,7 +74,7 @@
                 (loop (read))))))
         (hash-set! modulos (if (path? ruta) (path->string ruta) ruta) mod-env)
         (format "Módulo ~a importado correctamente" ruta))
-      (format "Error: No se pudo encontrar el módulo ~a" ruta)))
+      (error-modulo-no-encontrado ruta)))
 
 ;; Una variable se guarda como palabra: `7,8,10.en:notas`. Así al recargar el
 ;; módulo la variable se actualiza en vez de chocar con la que ya existe

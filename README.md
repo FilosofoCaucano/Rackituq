@@ -252,15 +252,19 @@ Estos no son palabras sino comandos con argumentos separados por espacios:
 | `importar.modulo`, `exportar.modulo` | guardan y cargan variables y sufijos; con `todo` guardan lo que haya |
 | `mem.limpiar` | vacía la caché de `mem.cache` |
 
-## Estado del lenguaje
+## Documentos
 
-[ESTADO.md](ESTADO.md) resume qué puede y qué no puede Rackituq hoy.
+- [ESPECIFICACION.md](ESPECIFICACION.md): la definición del lenguaje, con la
+  gramática en EBNF (ISO/IEC 14977), las palabras reservadas, la aritmética y
+  el catálogo de errores.
+- [ESTADO.md](ESTADO.md): qué puede y qué no puede Rackituq hoy.
 
 ## Estructura
 
 ```
 Lengua Rackituq.rkt     punto de entrada: la demo, o corre un .rkq
-pruebas.rkt             pruebas (raco test pruebas.rkt)
+pruebas.rkt             pruebas y conformidad (raco test pruebas.rkt)
+ESPECIFICACION.md       la definición del lenguaje (gramática, errores, tipos)
 ESTADO.md               qué puede y qué no puede el lenguaje hoy
 ejemplos/               programas .rkq
 nucleo/
@@ -273,6 +277,7 @@ nucleo/
   io.rkt                entrada y salida
   estado.rkt            las tablas globales
   repl.rkt              el REPL, explicar y correr archivos
+  errores.rkt           el catálogo de errores
 ```
 
 ### Agregar un morfema

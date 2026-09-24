@@ -2,7 +2,11 @@
 
 Estado al 23 de septiembre de 2026. Todo lo que dice este documento está
 probado corriendo el código, no leyéndolo. Las pruebas (`raco test pruebas.rkt`)
-son 42 y pasan.
+son 45 y pasan.
+
+La definición formal del lenguaje (gramática en EBNF, palabras reservadas,
+aritmética y catálogo de errores) está en [ESPECIFICACION.md](ESPECIFICACION.md);
+este documento es el resumen práctico.
 
 Rackituq es un lenguaje aglutinante: un programa puede ser **una sola palabra**,
 armada pegándole sufijos a una raíz, como en kalaallisut (groenlandés).
@@ -157,10 +161,16 @@ En una oración con `-guni`, `explicar` también dice qué rama tomó.
 `importar.modulo` / `exportar.modulo` (para variables), `mem.cache`,
 `leer.input` y las lambdas de Racket.
 
+### Palabras reservadas
+`sí`, `no`, `sino`, `esto`, `otro` y `$0`, `$1`… no pueden nombrar variables:
+intentarlo avisa en vez de dejar una variable que nunca se va a poder leer.
+
 ### Errores en español
-`No conozco la palabra banana`, `sub.lista no acepta 1 complemento(s)`,
-`el sufijo aumentar-en necesita 1 complemento(s)`. Un bucle que no avanza se
-corta solo y explica por qué, en vez de colgarse.
+Todos tienen la misma forma, `Error: ` y la causa en minúscula, y están
+catalogados en [ESPECIFICACION.md](ESPECIFICACION.md):
+`no conozco la palabra banana`, `el sufijo aumentar-en necesita 1 complemento(s)`,
+`el morfema entre no pudo con ese valor (/: division by zero)`. Un bucle que no
+avanza se corta solo y explica por qué, en vez de colgarse.
 
 ---
 
@@ -211,7 +221,7 @@ entrada.
 
 ```
 Lengua Rackituq.rkt     punto de entrada: demo o corre un .rkq
-pruebas.rkt             42 pruebas
+pruebas.rkt             45 pruebas (incluidas las de conformidad)
 ejemplos/               programas .rkq
 nucleo/
   vocabulario.rkt       el diccionario de morfemas (aquí se agregan nuevos)
@@ -223,6 +233,7 @@ nucleo/
   io.rkt                entrada y salida
   estado.rkt            las tablas globales
   repl.rkt              REPL, explicar y correr archivos
+  errores.rkt           el catálogo de errores
 ```
 
 La idea central: el punto **siempre** separa morfemas, y cada pieza se busca

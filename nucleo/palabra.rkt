@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt" "variables.rkt" "vocabulario.rkt")
+(require "errores.rkt" "estado.rkt" "variables.rkt" "vocabulario.rkt")
 (provide hablar evaluar-palabra ejecutar-palabra segmentar explicar tokenizar
          empieza-con-morfema?
          limite-repeticiones)
@@ -159,9 +159,9 @@
                    [(pair? posicionales)
                     (values (resolver-valor (first posicionales)) (rest posicionales) #f)]
                    [(string=? raiz "") (values (void) '() #f)]
-                   [else (error (format "Error: No conozco la palabra ~a" raiz))])])
+                   [else (error-palabra-desconocida raiz)])])
     (when (and (empty? morfemas) (pair? args))
-      (error (format "Error: ~a no tiene sufijos que usen los argumentos ~a" palabra args)))
+      (error-argumentos-sobran palabra args))
     (paso "raíz" (list raiz) inicial)
     (values (for/fold ([valor inicial])
                       ([m morfemas]
@@ -239,7 +239,7 @@
              (cond
                [(not cierto) "Bucle terminado"]
                [(>= vueltas limite-repeticiones)
-                (error "Error: -gaangat dio demasiadas vueltas")]
+                (error-vueltas-gaangat)]
                [else
                 (evaluar-oracion resto)
                 (let-values ([(v _) (evaluar-grupo (first grupos))])

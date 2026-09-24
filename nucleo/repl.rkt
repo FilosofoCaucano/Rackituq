@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt" "vocabulario.rkt" "modulos.rkt" "ejecutor.rkt" "palabra.rkt")
+(require "errores.rkt" "estado.rkt" "vocabulario.rkt" "modulos.rkt" "ejecutor.rkt" "palabra.rkt")
 (provide (all-defined-out))
 
 ;; ----- REPL (Read-Eval-Print Loop) -----
@@ -57,7 +57,7 @@
       (unless (or (string=? limpia "") (string-prefix? limpia ";;"))
         (with-handlers ([exn:fail?
                          (lambda (e)
-                           (error (format "~a\n   en la línea ~a: ~a" (exn-message e) numero limpia)))])
+                           (error-en-linea (exn-message e) numero limpia))])
           (ejecutar-linea limpia)))))
   (format "Programa ~a terminado" ruta))
 

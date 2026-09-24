@@ -225,7 +225,7 @@
   (check-equal? (hablar "5.p-fact2") 120)
   (check-equal? (hablar "1,2,3,4,5.cada:p-fact2") '(1 2 6 24 120))
   ;; lo local no se filtra hacia afuera
-  (check-exn #rx"No conozco la palabra n" (lambda () (hablar "n"))))
+  (check-exn #rx"no conozco la palabra n" (lambda () (hablar "n"))))
 
 (test-case "en: guarda aquí y global: guarda afuera"
   (ejecutar-linea "definir.variable p-total 0")
@@ -277,7 +277,7 @@
   ;; el segundo lado ni se mira: si se evaluara, `banana` daría error
   (check-equal? (hablar "no.y:(banana.suma)?") "no")
   (check-equal? (hablar "sí.o:(banana.suma)?") "sí")
-  (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "sí.y:(banana.suma)?"))))
+  (check-exn #rx"no conozco la palabra banana" (lambda () (hablar "sí.y:(banana.suma)?"))))
 
 (test-case "intenta y falla"
   (check-equal? (hablar "5.intenta:(mas:1)") 6)
@@ -350,7 +350,62 @@
   (check-equal? (hablar "1,2,3.p-a-todos:dobla") '(2 4 6))
   (check-exn #rx"necesita 1 complemento" (lambda () (hablar "1,2,3.p-a-todos"))))
 
+(test-case "las palabras reservadas no pueden nombrar variables"
+  (for ([reservada '("sí" "no" "sino" "esto" "otro" "$0" "$1")])
+    (check-exn #rx"palabra reservada"
+               (lambda () (hablar (format "5.en:~a" reservada)))
+               (format "~a debería estar reservada" reservada)))
+  (check-exn #rx"palabra reservada" (lambda () (ejecutar-linea "definir.variable no 7")))
+  (check-exn #rx"palabra reservada" (lambda () (ejecutar-linea "definir.variable.tipo esto 7 numero")))
+  ;; el lenguaje sí las usa por dentro
+  (check-equal? (hablar "1,2,3.cada:(esto.mas:1)") '(2 3 4))
+  (check-equal? (hablar "1,2,3.junta:(mas:otro)") 6)
+  (ejecutar-linea "definir.sufijo p-doble-mas $0.por:2.mas:$1")
+  (check-equal? (hablar "5.p-doble-mas:1") 11)
+  (check-equal? (hablar "no.no?") "sí"))
+
+;; ----- CONFORMIDAD CON ESPECIFICACION.md -----
+
+(test-case "el catálogo de errores dice lo que la especificación promete"
+  (define (mensaje-de pensar)
+    (with-handlers ([exn:fail? (lambda (e) (first (string-split (exn-message e) "\n")))])
+      (pensar)
+      ""))
+  ;; todos empiezan igual y siguen en minúscula
+  (for ([caso (list (lambda () (hablar "banana.suma"))
+                    (lambda () (hablar "5.volar"))
+                    (lambda () (hablar "5.en:sino"))
+                    (lambda () (hablar "\"doce\".numero"))
+                    (lambda () (hablar "5.mas:\"x\""))
+                    (lambda () (hablar "1.entre:0")))])
+    (check-regexp-match #rx"^Error: [a-záéíóúñ-]" (mensaje-de caso)))
+  ;; y estos son literales, tal cual están en la tabla
+  (check-equal? (mensaje-de (lambda () (hablar "banana.suma")))
+                "Error: no conozco la palabra banana")
+  (check-equal? (mensaje-de (lambda () (hablar "5.volar")))
+                "Error: no conozco el sufijo volar")
+  (check-equal? (mensaje-de (lambda () (hablar "5.en:sino")))
+                "Error: la palabra reservada \"sino\" no puede ser el nombre de una variable")
+  (check-equal? (mensaje-de (lambda () (hablar "1.entre:0")))
+                "Error: el morfema entre no pudo con ese valor (/: division by zero)")
+  (check-equal? (mensaje-de (lambda () (hablar "5.falla:\"me plantó\"")))
+                "Error: me plantó"))
+
+(test-case "la aritmética se comporta como dice la especificación"
+  ;; exactos
+  (check-equal? (hablar "7.entre:2") 7/2)
+  (check-equal? (hablar "2.a-la:100") (expt 2 100))
+  ;; mezclar exacto con decimal da decimal
+  (check-equal? (hablar "1.entre:3.mas:1.0") 1.3333333333333333)
+  ;; redondeo al par más cercano
+  (check-equal? (hablar "2.5.redondea") 2)
+  (check-equal? (hablar "3.5.redondea") 4)
+  ;; igual compara el valor, no la forma
+  (check-equal? (hablar "5.igual:5.0?") "sí")
+  ;; dividir entre cero es error, no infinito
+  (check-exn #rx"division by zero" (lambda () (hablar "1.entre:0"))))
+
 (test-case "errores claros"
-  (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "banana.suma")))
-  (check-exn #rx"No conozco el sufijo volar" (lambda () (hablar "5.volar")))
+  (check-exn #rx"no conozco la palabra banana" (lambda () (hablar "banana.suma")))
+  (check-exn #rx"no conozco el sufijo volar" (lambda () (hablar "5.volar")))
   (check-exn #rx"demasiadas vueltas" (lambda () (hablar "1.en:p-k p-k.mayor:0-gaangat p-k.mas:1.en:p-k"))))

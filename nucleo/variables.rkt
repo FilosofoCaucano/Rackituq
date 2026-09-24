@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt")
+(require "errores.rkt" "estado.rkt")
 (provide (all-defined-out))
 
 ;; ----- ÁMBITOS -----
@@ -30,12 +30,34 @@
 (define (variable-existe? nombre)
   (and (tabla-de nombre) #t))
 
+;; ----- PALABRAS RESERVADAS -----
+;;
+;; El lenguaje usa estos nombres para sí mismo, así que no pueden nombrar una
+;; variable: si se pudiera, la variable quedaría inalcanzable. Están en
+;; ESPECIFICACION.md.
+;;   sí, no      los valores booleanos
+;;   sino        separa las dos ramas de un condicional
+;;   esto, otro  el valor que llega a una cadena y el que la acompaña
+;;   $0, $1, ... el valor y los complementos de un sufijo
+(define palabras-reservadas '("sí" "no" "sino" "esto" "otro"))
+
+(define (reservada? nombre)
+  (and (string? nombre)
+       (or (and (member nombre palabras-reservadas) #t)
+           (regexp-match? #px"^\\$[0-9]+$" nombre))))
+
+;; El lenguaje mismo sí puede usarlas (así ata `esto` o `$0`); un programa no
+(define (comprobar-nombre nombre)
+  (when (reservada? nombre)
+    (error-reservada nombre)))
+
 ;; ----- SISTEMA DE INMUTABILIDAD -----
 
 ;; Función para definir una variable inmutable
 (define (definir-variable nombre valor)
+  (comprobar-nombre nombre)
   (when (hash-has-key? (ambito-actual) nombre)
-    (error (format "Error: La variable ~a ya está definida" nombre)))
+    (error-variable-existe nombre))
   (hash-set! (ambito-actual) nombre valor)
   (format "Variable ~a definida con valor ~a" nombre valor))
 
@@ -49,20 +71,20 @@
   (let ([tabla (tabla-de nombre)])
     (if tabla
         (hash-ref tabla nombre)
-        (error (format "Error: Variable ~a no encontrada" nombre)))))
+        (error-variable-no-encontrada nombre))))
 
 ;; Actualizar una variable (solo para variables mutables)
 (define (actualizar-variable nombre valor)
+  (comprobar-nombre nombre)
   (let ([tabla (tabla-de nombre)])
     (cond
       [(not tabla)
-       (error (format "Error: Variable ~a no encontrada" nombre))]
+       (error-variable-no-encontrada nombre)]
       ;; Una variable global con tipo declarado solo acepta valores de ese tipo
       [(and (eq? tabla variables)
             (hash-has-key? tipos nombre)
             (not (verificar-tipo nombre (tipo-de valor))))
-       (error (format "Error: La variable ~a es de tipo ~a, no acepta ~a"
-                      nombre (hash-ref tipos nombre) valor))]
+       (error-tipo-variable nombre (hash-ref tipos nombre) valor)]
       [else
        (hash-set! tabla nombre valor)
        (format "Variable ~a actualizada con valor ~a" nombre valor)])))
@@ -70,6 +92,7 @@
 ;; Guardar en el ámbito actual: dentro de un sufijo es local a esa llamada,
 ;; y arriba es global. Así una recursión no pisa lo que guardó la de afuera
 (define (guardar-variable nombre valor)
+  (comprobar-nombre nombre)
   (if (and (eq? (ambito-actual) variables) (hash-has-key? variables nombre))
       ;; arriba, sobre una variable que ya existe, valen los tipos declarados
       (actualizar-variable nombre valor)
@@ -79,6 +102,7 @@
 
 ;; Guardar en el ámbito global aunque estemos dentro de un sufijo
 (define (guardar-global nombre valor)
+  (comprobar-nombre nombre)
   (if (hash-has-key? variables nombre)
       (let ([guardados (unbox ambitos)])
         ;; el chequeo de tipos mira el ámbito global
@@ -93,6 +117,7 @@
 
 ;; Función para definir una variable con tipo
 (define (definir-variable-con-tipo nombre valor tipo)
+  (comprobar-nombre nombre)
   (cond
     [(and (eq? tipo 'numero) (number? valor))
      (hash-set! variables nombre valor)
@@ -114,7 +139,7 @@
      (hash-set! variables nombre valor)
      (hash-set! tipos nombre 'funcion)
      (format "Variable ~a definida como función" nombre)]
-    [else (format "Error: El valor ~a no coincide con el tipo ~a" valor tipo)]))
+    [else (error-tipo-valor valor tipo)]))
 
 ;; Tipo Rackituq de un valor
 (define (tipo-de valor)

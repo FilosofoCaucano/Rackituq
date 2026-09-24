@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt" "variables.rkt")
+(require "errores.rkt" "estado.rkt" "variables.rkt")
 (provide buscar-morfema piezas-maximas aplicar-morfema resolver resolver-valor
          listo texto-rackituq texto-literal? lista-literal? sub-palabra?
          instalar-evaluador! instalar-encadenador! texto-de-valor)
@@ -95,7 +95,7 @@
      ;; Las comas separan, pero no dentro de las comillas
      (map resolver (regexp-match* regex-pedazo-lista elemento))]
     [(variable-existe? elemento) (obtener-variable elemento)]
-    [else (error (format "Error: No conozco la palabra ~a" elemento))]))
+    [else (error-palabra-desconocida elemento)]))
 
 ;; Los textos se leen como nombres o literales; los demás valores pasan tal cual
 (define (resolver-valor x)
@@ -115,14 +115,22 @@
             [(eq? (morfema-clase m) 'crudo)
              ((morfema-proc m) valor complementos raiz)]
             [(not (procedure-arity-includes? (morfema-proc m) (add1 (length complementos))))
-             (error (format "Error: ~a no acepta ~a complemento(s); recibió ~a"
-                            nombre (length complementos) (map resolver-valor complementos)))]
+             (error-complementos-morfema nombre (length complementos) (map resolver-valor complementos))]
             [else
-             (apply (morfema-proc m) valor (map resolver-valor complementos))]))]
+             ;; Un fallo de Racket se vuelve a contar con la forma del lenguaje
+             (with-handlers ([exn:fail? (lambda (e) (volver-a-contar nombre e))])
+               (apply (morfema-proc m) valor (map resolver-valor complementos)))]))]
     ;; Las funciones que define el usuario también se pegan como morfemas
     [(hash-ref funciones nombre #f)
      => (lambda (f) (apply f valor (map resolver-complemento complementos)))]
-    [else (error (format "Error: No conozco el sufijo ~a" nombre))]))
+    [else (error-sufijo-desconocido nombre)]))
+
+;; Los errores que ya son del lenguaje pasan tal cual; los de Racket se
+;; envuelven, guardando su mensaje como detalle
+(define (volver-a-contar nombre e)
+  (if (string-prefix? (exn-message e) "Error: ")
+      (raise e)
+      (error-morfema-fallo nombre (first (string-split (exn-message e) "\n")))))
 
 ;; Un sufijo del usuario puede recibir el nombre de otra operación como
 ;; complemento (`1,2,3.a-todos:dobla`): ese nombre se pasa tal cual
@@ -146,6 +154,9 @@
     [(and (string? op) (variable-existe? op))
      (aplicar-operacion (obtener-variable op) valor extras)]
     [else (aplicar-morfema valor (string-trim op "." #:right? #f) extras)]))
+
+(define (mismo-valor? a b)
+  (if (and (number? a) (number? b)) (= a b) (equal? a b)))
 
 ;; Cómo se escribe un valor para volver a meterlo en una palabra
 (define (texto-de-valor v)
@@ -273,13 +284,13 @@
 (definir-morfema '("diccionario" "dicc") 'valor
   (lambda (l)
     (when (odd? (length l))
-      (error "Error: un diccionario necesita pares de clave y valor"))
+      (error-diccionario-pares))
     (apply hash l)))
 (definir-morfema '("pon")     'valor (lambda (d clave valor) (hash-set d clave valor)))
 (definir-morfema '("quita")   'valor (lambda (d clave) (hash-remove d clave)))
 (definir-morfema '("valor-de" "saca") 'valor
   (lambda (d clave)
-    (hash-ref d clave (lambda () (error (format "Error: el diccionario no tiene ~s" clave))))))
+    (hash-ref d clave (lambda () (error-diccionario-clave clave)))))
 (definir-morfema '("claves")  'valor (lambda (d) (ordenar-claves d)))
 (definir-morfema '("valores") 'valor
   (lambda (d) (map (lambda (k) (hash-ref d k)) (ordenar-claves d))))
@@ -316,7 +327,7 @@
 
 ;; `falla:"mensaje"` corta la oración con ese error
 (definir-morfema '("falla") 'valor
-  (lambda (v mensaje) (error (format "Error: ~a" mensaje))))
+  (lambda (v mensaje) (error-del-programa mensaje)))
 
 ;; ----- PREDICADOS: sirven con el modo pregunta (?), con -guni y con `solo:` -----
 (definir-morfema '("par")      'valor even?)
@@ -332,8 +343,9 @@
       [else (empty? v)])))
 (definir-morfema '("mayor")    'valor (lambda (v n) (> v n)))
 (definir-morfema '("menor")    'valor (lambda (v n) (< v n)))
-(definir-morfema '("igual")    'valor (lambda (v n) (equal? v n)))
-(definir-morfema '("distinto") 'valor (lambda (v n) (not (equal? v n))))
+;; Entre números compara el valor, no la forma: 5.igual:5.0 es sí
+(definir-morfema '("igual")    'valor (lambda (v n) (mismo-valor? v n)))
+(definir-morfema '("distinto") 'valor (lambda (v n) (not (mismo-valor? v n))))
 ;; Combinar condiciones. El complemento suele ser una sub-palabra:
 ;; edad.mayor:17.y:(edad.menor:65). Son de corto circuito: el segundo lado
 ;; se evalúa solo si hace falta
@@ -402,7 +414,7 @@
     (if (number? v)
         v
         (or (string->number (string-trim v))
-            (error (format "Error: ~s no es un número" v))))))
+            (error-no-numero v)))))
 
 ;; ----- SALIDA -----
 (definir-morfema '("muestra" "mostrar") 'valor
