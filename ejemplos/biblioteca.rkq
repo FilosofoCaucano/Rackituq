@@ -1,0 +1,14 @@
+;; Una biblioteca escrita en Rackituq: se define, se guarda y se vuelve a cargar
+
+definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
+definir.sufijo iniciales $0.parte.cada:primero.cada:mayusculas.une:"."
+definir.sufijo seguro-entre $1.cero-guni 0.falla:"división entre cero" sino $0.entre:$1
+
+;; Guardar todo lo definido hasta aquí
+exportar.modulo todo ejemplos/milib.rkq
+
+;; Usar los sufijos
+5.fact.mostrar
+"william david".iniciales.mostrar
+10.seguro-entre:2.mostrar
+10.intenta:(seguro-entre:0):("no se pudo dividir").mostrar

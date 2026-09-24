@@ -2,7 +2,7 @@
 
 Estado al 23 de septiembre de 2026. Todo lo que dice este documento está
 probado corriendo el código, no leyéndolo. Las pruebas (`raco test pruebas.rkt`)
-son 34 y pasan.
+son 38 y pasan.
 
 Rackituq es un lenguaje aglutinante: un programa puede ser **una sola palabra**,
 armada pegándole sufijos a una raíz, como en kalaallisut (groenlandés).
@@ -92,6 +92,30 @@ paréntesis; adentro, `esto` es el valor que llega y `otro` el que lo acompaña:
 1,2,3,4,5,6.solo:(mayor:2.y:(esto.menor:6))  → (3 4 5)
 ```
 
+### Texto por posición
+```
+"hola".letra:0                               → "h"
+"hola mundo".trozo:0:4                       → "hola"
+"hola".invierte                              → "aloh"
+"hola".parte:""                              → ("h" "o" "l" "a")
+```
+`cuenta`, `primero`, `ultimo`, `indice`, `invierte`, `concatenar` y `contiene`
+sirven igual para textos y para listas.
+
+### Atajar errores
+```
+5.intenta:(mas:1)                            → 6
+"hola".intenta:(mas:1)                       → no
+"hola".intenta:(mas:1):(concatenar:" (falló)")  → "hola (falló)"
+0.falla:"división entre cero"                → corta con ese error
+```
+
+### Bibliotecas propias
+Los sufijos se guardan con su cuerpo, así que `exportar.modulo todo mi.rkq`
+escribe una biblioteca **que es un programa Rackituq normal**, legible y
+editable, y `importar.modulo` la vuelve a cargar (dos veces seguidas tampoco
+choca).
+
 ### Programas guardados
 Un archivo `.rkq` es una línea por instrucción, con comentarios `;;`.
 
@@ -127,42 +151,38 @@ corta solo y explica por qué, en vez de colgarse.
 `5.por:(2 .mas:1)` falla, porque la oración se parte por espacios antes de
 mirar los paréntesis.
 
-### 2. Varias cosas todavía se escriben en Racket, no en Rackituq
+### 2. Algunas cosas todavía se escriben en Racket
 - `definir.funcion.recursiva` pide el cuerpo como expresión de Racket (aunque
   ya no hace falta: la recursión se escribe con `definir.sufijo` y `$0`).
 - `lambda.simple`, `lambda.multi` y `mem.cache` necesitan procedimientos de
   Racket, así que desde el REPL son casi inusables.
-- `exportar.modulo` guarda variables, pero no funciones ni sufijos.
+- Los módulos guardan variables y sufijos, pero no las funciones hechas en
+  Racket, que no tienen forma de texto.
 
-### 3. Los textos no se indexan
-`"hola".ind.ice:0` falla; `ind.ice` es solo para listas. Tampoco hay forma de
-cambiar un elemento de una lista en su lugar.
+### 3. Las listas no se modifican en su lugar
+No hay forma de cambiar el elemento 2 de una lista: siempre se arma una nueva.
 
 ### 4. No hay diccionarios ni estructuras propias
 Solo números, textos, listas y sí/no. No se pueden definir tipos nuevos.
 
-### 5. No hay manejo de errores dentro del lenguaje
-Un error corta la oración. No existe algo como "intentá esto y si falla hacé
-aquello".
-
-### 6. La entrada de usuario es solo clásica
+### 5. La entrada de usuario es solo clásica
 `leer.input` funciona como comando, pero no hay un morfema que lea del
 teclado dentro de una palabra.
 
-### 7. Los tipos son mínimos
+### 6. Los tipos son mínimos
 Cinco tipos (`numero`, `texto`, `lista`, `booleano`, `funcion`), y solo se
 revisan en variables declaradas con `definir.variable.tipo`. Los morfemas y
 los sufijos no declaran qué reciben ni qué devuelven: un error de tipo
 aparece recién al correr.
 
-### 8. Rendimiento de la recursión
+### 7. Rendimiento de la recursión
 Cada llamada recursiva reemplaza `$0` por el valor y vuelve a analizar el
 texto. Hoy `fib 22` tarda unos 0,8 segundos (antes de optimizar tardaba 33).
 Sirve para aprender y para programas chicos, no para cálculo pesado. Tampoco
 hay optimización de llamada final, así que una recursión muy profunda puede
 agotar la memoria.
 
-### 9. Dos estilos conviviendo
+### 8. Dos estilos conviviendo
 El estilo clásico (`x.sum.ar 2 3`) y el aglutinante usan el mismo motor, pero
 la regla que los distingue en el REPL tiene bordes raros: si existe una
 variable llamada `x`, `x.sum.ar 2 3` usa su valor en vez de tomar el 2 como
@@ -174,7 +194,7 @@ entrada.
 
 ```
 Lengua Rackituq.rkt     punto de entrada: demo o corre un .rkq
-pruebas.rkt             34 pruebas
+pruebas.rkt             38 pruebas
 ejemplos/               programas .rkq
 nucleo/
   vocabulario.rkt       el diccionario de morfemas (aquí se agregan nuevos)
@@ -199,10 +219,10 @@ nuevo es agregar una línea, no una rama más en un `cond`.
 
 En el orden en que más destraban el lenguaje:
 
-1. **Morfemas de texto por posición** (`letra:0`, `trozo:1:3`), que hoy no existen.
-2. **Guardar sufijos y funciones** en los módulos, para poder armar una
-   biblioteca escrita en Rackituq.
-3. **Manejo de errores** dentro del lenguaje.
-4. **Corto circuito en `y` / `o`**: hoy los dos lados se evalúan siempre.
-5. **Acelerar la recursión**, guardando el análisis de cada palabra en vez de
-   rehacerlo en cada llamada.
+1. **Un morfema para leer del teclado**, para que un programa pueda pedir
+   datos sin salir del estilo aglutinante.
+2. **Diccionarios** (pares nombre/valor), que hoy no existen.
+3. **Sub-palabras con espacios**, hoy imposibles.
+4. **Acelerar la recursión de verdad**: guardar el cuerpo del sufijo ya
+   analizado y meterle los valores, en vez de rehacer el texto en cada llamada.
+5. **Tipos en los morfemas**, para avisar antes de correr.

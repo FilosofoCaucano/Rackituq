@@ -2,6 +2,7 @@
 
 (require "estado.rkt" "variables.rkt" "vocabulario.rkt")
 (provide hablar evaluar-palabra ejecutar-palabra segmentar explicar tokenizar
+         empieza-con-morfema?
          limite-repeticiones)
 
 ;; ----- SEGMENTADOR DE PALABRAS AGLUTINANTES -----
@@ -27,9 +28,18 @@
 ;; Los complementos pueden ser sub-palabras entre paréntesis: 5.por:(4.menos:1)
 (instalar-evaluador! (lambda (texto) (ejecutar-palabra texto)))
 
-;; Y una cadena entre paréntesis se puede aplicar a un valor: cada:(mas:1.por:2).
-;; Dentro de la cadena, `esto` es el valor que llega y `otro` el que la acompaña
-;; (el segundo operando de junta:), así se pueden escribir condiciones completas
+;; ¿El texto arranca con un morfema o con un sufijo del usuario? Entonces es
+;; una cadena que se aplica a un valor (`mas:1.por:2`). Si arranca con otra
+;; cosa (un número, un texto, una variable) es una palabra suelta
+(define (empieza-con-morfema? texto)
+  (let ([primero (car (regexp-split #px"[.: ]" texto))])
+    (or (string=? primero "")
+        (and (buscar-morfema primero) #t)
+        (hash-has-key? funciones primero))))
+
+;; Una cadena entre paréntesis se puede aplicar a un valor: cada:(mas:1.por:2).
+;; Dentro, `esto` es el valor que llega y `otro` el que la acompaña (el segundo
+;; operando de junta:, o el mensaje del error en intenta:)
 (instalar-encadenador!
  (lambda (texto valor extras)
    (con-ambito-nuevo
@@ -37,8 +47,10 @@
       (definir-local "esto" valor)
       (unless (empty? extras)
         (definir-local "otro" (resolver-valor (first extras))))
-      (ejecutar-palabra (if (string-prefix? texto ".") texto (string-append "." texto))
-                        #:entrada valor)))))
+      (if (empieza-con-morfema? texto)
+          (ejecutar-palabra (if (string-prefix? texto ".") texto (string-append "." texto))
+                            #:entrada valor)
+          (ejecutar-palabra texto))))))
 
 ;; Partir un texto por un carácter, sin mirar dentro de las comillas ni de los
 ;; paréntesis. El punto entre dígitos es decimal, no separador: 3.5 es un número
@@ -97,9 +109,23 @@
                       (cons (cons (string-join (map car grupo) ".") (cdr (last grupo))) acc)))
               (loop (rest ps) (cons (first ps) acc)))))))
 
+;; El análisis de cada palabra se guarda: en un bucle o en una recursión la
+;; misma palabra vuelve a aparecer muchas veces
+(define cache-segmentos (make-hash))
+(define limite-cache 20000)
+
+(define (segmentar cuerpo)
+  (let ([guardado (hash-ref cache-segmentos cuerpo #f)])
+    (if guardado
+        (values (car guardado) (cdr guardado))
+        (let-values ([(raiz morfemas) (segmentar-palabra cuerpo)])
+          (when (< (hash-count cache-segmentos) limite-cache)
+            (hash-set! cache-segmentos cuerpo (cons raiz morfemas)))
+          (values raiz morfemas)))))
+
 ;; Partir una palabra en su raíz y sus morfemas: cada morfema es (nombre . complementos)
 ;; ".sum.ar" (con punto inicial) no tiene raíz
-(define (segmentar cuerpo)
+(define (segmentar-palabra cuerpo)
   (let* ([piezas (filter non-empty-string? (partir cuerpo #\.))]
          [sin-raiz? (string-prefix? cuerpo ".")]
          [raiz (if (or sin-raiz? (empty? piezas)) "" (first piezas))]

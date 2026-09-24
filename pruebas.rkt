@@ -260,6 +260,55 @@
   (check-equal? (hablar "1,2,3,4,5,6.solo:(mayor:2.y:(esto.menor:6))") '(3 4 5))
   (check-equal? (hablar "1,2,3.junta:(mas:otro)") 6))
 
+(test-case "texto por posición"
+  (check-equal? (hablar "\"hola\".letra:0") "h")
+  (check-equal? (hablar "\"hola mundo\".trozo:0:4") "hola")
+  (check-equal? (hablar "\"hola mundo\".trozo:5") "mundo")
+  (check-equal? (hablar "\"hola\".indice:1") "o")
+  (check-equal? (hablar "\"hola\".primero") "h")
+  (check-equal? (hablar "\"hola\".ultimo") "a")
+  (check-equal? (hablar "\"hola\".invierte") "aloh")
+  (check-equal? (hablar "\"hola\".parte:\"\"") '("h" "o" "l" "a"))
+  ;; las listas siguen igual
+  (check-equal? (hablar "1,2,3.invierte") '(3 2 1))
+  (check-equal? (hablar "1,2,3.primero") 1))
+
+(test-case "y/o son de corto circuito"
+  ;; el segundo lado ni se mira: si se evaluara, `banana` daría error
+  (check-equal? (hablar "no.y:(banana.suma)?") "no")
+  (check-equal? (hablar "sí.o:(banana.suma)?") "sí")
+  (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "sí.y:(banana.suma)?"))))
+
+(test-case "intenta y falla"
+  (check-equal? (hablar "5.intenta:(mas:1)") 6)
+  (check-equal? (hablar "\"hola\".intenta:(mas:1)") #f)
+  (check-equal? (hablar "\"hola\".intenta:(mas:1):(concatenar:\" (no se pudo)\")")
+                "hola (no se pudo)")
+  (check-exn #rx"Error: no es positivo" (lambda () (hablar "5.falla:\"no es positivo\"")))
+  ;; un sufijo puede fallar a propósito, y quien lo llama puede atajarlo
+  (ejecutar-linea "definir.sufijo p-mitad $0.cero-guni 0.falla:\"división entre cero\" sino 10.entre:$0")
+  (check-equal? (hablar "2.p-mitad") 5)
+  (check-equal? (hablar "0.intenta:(p-mitad)") #f))
+
+(test-case "un módulo guarda variables y sufijos"
+  (define archivo (make-temporary-file "rackituq-~a.rkq"))
+  (ejecutar-linea "definir.variable p-saludo \"hola\"")
+  (ejecutar-linea "definir.sufijo p-fact3 $0.menor:2-guni 1 sino $0.por:($0.menos:1.p-fact3)")
+  (ejecutar-comando "exportar.modulo" '("p-saludo" "p-fact3") archivo)
+  (hash-remove! variables "p-saludo")
+  (hash-remove! funciones "p-fact3")
+  (ejecutar-comando "importar.modulo" archivo)
+  (check-equal? (hablar "p-saludo") "hola")
+  (check-equal? (hablar "5.p-fact3") 120)
+  ;; "todo" guarda lo que haya definido, y el módulo es un programa Rackituq
+  (ejecutar-comando "exportar.modulo" "todo" archivo)
+  (check-true (string-contains? (file->string archivo) "definir.sufijo p-fact3"))
+  (check-true (string-contains? (file->string archivo) ".en:p-saludo"))
+  ;; importarlo dos veces no choca
+  (ejecutar-comando "importar.modulo" archivo)
+  (check-equal? (hablar "p-saludo") "hola")
+  (delete-file archivo))
+
 (test-case "errores claros"
   (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "banana.suma")))
   (check-exn #rx"No conozco el sufijo volar" (lambda () (hablar "5.volar")))

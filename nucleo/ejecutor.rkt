@@ -93,13 +93,6 @@
 
 ;; ----- DEFINICIÓN DE SUFIJOS -----
 
-;; Cómo se escribe un valor para volver a meterlo en una palabra
-(define (texto-de-valor v)
-  (cond
-    [(string? v) (format "~s" v)]
-    [(list? v) (string-join (map (lambda (x) (format "~a" x)) v) ",")]
-    [else (format "~a" v)]))
-
 ;; Guardar una cadena de morfemas como un sufijo nuevo. Los complementos que
 ;; reciba el sufijo se escriben $1, $2, ... dentro de la cadena:
 ;;   (definir-sufijo "cuadrado-mas-uno" "a-la:2.mas:1")  ->  3.cuadrado-mas-uno = 10
@@ -111,11 +104,11 @@
 (define (definir-sufijo nombre cuerpo)
   ;; Es una cadena si arranca con un morfema (`mas:$1`, `.a-la:2`); si arranca
   ;; con otra cosa (una raíz, una variable, $0) es una oración completa
-  (let* ([primer-nombre (car (regexp-split #px"[.: ]" cuerpo))]
-         [cadena? (and (not (string-contains? cuerpo "$0"))
-                       (or (string=? primer-nombre "")
-                           (buscar-morfema primer-nombre)))]
+  (let* ([cadena? (and (not (string-contains? cuerpo "$0"))
+                       (empieza-con-morfema? cuerpo))]
          [oracion? (not cadena?)])
+    ;; El cuerpo se guarda en texto para poder exportarlo a un módulo
+    (hash-set! sufijos nombre cuerpo)
     (hash-set! funciones nombre
                (lambda (v . args)
                  (let ([texto (reemplazar-huecos cuerpo nombre v args)])
@@ -130,6 +123,9 @@
                                                 (string-append "." texto))
                                             #:entrada v)))))))
     (format "Sufijo ~a definido como ~a" nombre cuerpo)))
+
+;; Así un módulo puede volver a definir los sufijos que guardó
+(instalar-definidor-de-sufijos! definir-sufijo)
 
 ;; Cambiar $0 por el valor que recibe el sufijo, y $1, $2, ... por sus complementos
 (define (reemplazar-huecos cuerpo nombre valor args)

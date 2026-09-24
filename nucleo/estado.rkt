@@ -20,3 +20,6 @@
 ;; Pila de ámbitos locales: cada llamada a un sufijo o función abre uno.
 ;; Las variables de arriba viven en `variables`, que es el ámbito global
 (define ambitos (box '()))
+
+;; Cuerpo en texto de los sufijos definidos en Rackituq, para poder exportarlos
+(define sufijos (make-hash))

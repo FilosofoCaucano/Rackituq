@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt" "vocabulario.rkt" "ejecutor.rkt" "palabra.rkt")
+(require "estado.rkt" "vocabulario.rkt" "modulos.rkt" "ejecutor.rkt" "palabra.rkt")
 (provide (all-defined-out))
 
 ;; ----- REPL (Read-Eval-Print Loop) -----
@@ -61,6 +61,9 @@
           (ejecutar-linea limpia)))))
   (format "Programa ~a terminado" ruta))
 
+;; Un módulo en formato Rackituq se corre línea por línea
+(instalar-ejecutor-de-lineas! ejecutar-linea)
+
 ;; Función REPL básico para pruebas
 (define (repl)
   (display "Racketiitut> ")
@@ -74,5 +77,5 @@
                ;; Si la línea ya imprimió algo (`.muestra`), no se repite el resultado
                [imprimio? (> (file-position (current-output-port)) antes)])
           (unless (or (void? resultado) imprimio?)
-            (displayln resultado))))
+            (displayln (texto-rackituq resultado)))))
       (repl))))

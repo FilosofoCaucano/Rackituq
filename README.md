@@ -105,11 +105,12 @@ dentro de complementos: `cada:sumar:1`.
 | Aritmética | `sum.ar`/`sumar`/`mas`, `rest.ar`/`restar`/`menos`, `mult.iplicar`/`multiplicar`/`por`, `div.idir`/`dividir`/`entre`, `pot.enciar`/`potenciar`/`a-la`, `mod.ul`/`modulo`/`mod`, `dobla`, `neg`, `promedio`, `decimal`, `redondea` |
 | Matemática | `raiz`, `sin.us`/`seno`, `cos.inus`/`coseno`, `tan.gente`/`tangente`, `log.aritmo`/`logaritmo`, `exp.onencial`/`exponencial`, `abs.oluto`/`absoluto`/`abs`, `rand.aleatorio`/`aleatorio`, `min.imo`/`minimo`, `max.imo`/`maximo` |
 | Listas | `lista`, `sub.lista`/`sublista`/`desde`, `ind.ice`/`indice`, `prim.ero`/`primero`, `ult.imo`/`ultimo`, `suma`, `producto`, `invierte`, `ordena`, `con` |
-| Texto | `texto`, `mayusculas`, `minusculas`, `recorta`, `parte:" "`, `une:"-"`, `reemplaza:viejo:nuevo` |
-| Texto y listas | `conc.atenar`/`concatenar`/`pega`, `long.itud`/`longitud`/`cuenta`, `contiene` |
+| Texto | `texto`, `mayusculas`, `minusculas`, `recorta`, `parte:" "` (con `""` parte en letras), `une:"-"`, `reemplaza:viejo:nuevo`, `letra:0`, `trozo:0:4` |
+| Texto y listas | `conc.atenar`/`concatenar`/`pega`, `long.itud`/`longitud`/`cuenta`, `contiene`, `ind.ice`/`indice`, `prim.ero`/`primero`, `ult.imo`/`ultimo`, `invierte` |
+| Errores | `intenta:(cadena)` y `intenta:(cadena):(respaldo)`, `falla:"mensaje"` |
 | Orden superior | `map`/`cada`, `filter`/`filtra`/`solo`, `reduce`/`junta` — su complemento es otra operación, y se pueden anidar: `cada:cada:por:2` |
 | Predicados | `par`, `impar`, `positivo`, `negativo`, `cero`, `vacia`, `mayor`, `menor`, `igual`, `distinto` |
-| Condiciones | `y`, `o`, `no`/`niega` — el complemento suele ser una sub-palabra: `edad.mayor:17.y:(edad.menor:65)` |
+| Condiciones | `y`, `o`, `no`/`niega` — el complemento suele ser una sub-palabra: `edad.mayor:17.y:(edad.menor:65)`. `y` y `o` son de corto circuito |
 | Tipos y variables | `es:numero` (usa el tipo declarado si lo hay), `en:nombre`/`guarda:nombre` (guarda el valor y lo deja seguir), `global:nombre` |
 | Otros | `muestra`/`mostrar`, `lazy`/`diferir`, `force`/`forzar`, `lambda.simple`, `lambda.multi`, `lambda.aplicar`/`aplicar`, `mem.cache`, `mem.limpiar` |
 
@@ -169,6 +170,41 @@ definir.sufijo acumular $0.mas:total.global:total
 7.acumular                   → 12
 ```
 
+## Bibliotecas
+
+Los sufijos se guardan con su cuerpo en texto, así que una biblioteca escrita
+en Rackituq se exporta y se vuelve a cargar:
+
+```
+definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
+exportar.modulo todo ejemplos/milib.rkq
+...
+importar.modulo ejemplos/milib.rkq
+5.fact                       → 120
+```
+
+El módulo que se guarda es **un programa Rackituq normal**: se puede leer,
+editar a mano y hasta correr con `correr`.
+
+```
+;; Biblioteca Rackituq
+7,8,10.en:notas
+definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
+```
+
+Hay un ejemplo completo en [ejemplos/biblioteca.rkq](ejemplos/biblioteca.rkq).
+
+## Cuando algo falla
+
+```
+5.intenta:(mas:1)                                  → 6
+"hola".intenta:(mas:1)                             → no
+"hola".intenta:(mas:1):(concatenar:" (no se pudo)") → "hola (no se pudo)"
+0.falla:"división entre cero"                       → corta con ese error
+```
+
+Dentro del respaldo, `otro` es el mensaje del error.
+
 ## Comandos especiales
 
 Estos no son palabras sino comandos con argumentos separados por espacios:
@@ -184,7 +220,7 @@ Estos no son palabras sino comandos con argumentos separados por espacios:
 | `mientras` | `mientras i 5 < x.sum.ar.en:i 1` (el cuerpo guarda el nuevo valor con `.en:`) |
 | `explicar` | `explicar 5.mas:3.por:2` |
 | `mostrar.salida` | `mostrar.salida "Hola Mundo"` o `mostrar.salida "Hola ~a" nombre` |
-| `importar.modulo`, `exportar.modulo` | guardan y cargan variables en un archivo |
+| `importar.modulo`, `exportar.modulo` | guardan y cargan variables y sufijos; con `todo` guardan lo que haya |
 | `mem.limpiar` | vacía la caché de `mem.cache` |
 
 ## Estado del lenguaje

@@ -3,7 +3,7 @@
 (require "estado.rkt" "variables.rkt")
 (provide buscar-morfema piezas-maximas aplicar-morfema resolver resolver-valor
          listo texto-rackituq texto-literal? lista-literal? sub-palabra?
-         instalar-evaluador! instalar-encadenador!)
+         instalar-evaluador! instalar-encadenador! texto-de-valor)
 
 ;; ----- DICCIONARIO DE MORFEMAS -----
 ;;
@@ -133,6 +133,15 @@
     [(sub-palabra? op) ((unbox encadenador) (interior op) valor extras)]
     [else (aplicar-morfema valor (string-trim op "." #:right? #f) extras)]))
 
+;; Cómo se escribe un valor para volver a meterlo en una palabra
+(define (texto-de-valor v)
+  (cond
+    [(string? v) (format "~s" v)]
+    [(eq? v #t) "sí"]
+    [(eq? v #f) "no"]
+    [(list? v) (string-join (map texto-de-valor v) ",")]
+    [else (format "~a" v)]))
+
 ;; Cómo se lee un valor en Rackituq: los booleanos son sí/no
 (define (texto-rackituq v)
   (cond
@@ -180,25 +189,40 @@
   (lambda (v . resto)
     (if (string? v) (apply string-append v (map texto-rackituq resto)) (apply append v resto))))
 (definir-morfema '("ind.ice" "indice")               'valor
-  (lambda (l [i 0]) (list-ref l (if (number? i) i 0))))
+  (lambda (l [i 0])
+    (let ([n (if (number? i) i 0)])
+      (if (string? l) (substring l n (add1 n)) (list-ref l n)))))
 (definir-morfema '("long.itud" "longitud" "cuenta")  'valor
   (lambda (v) (if (string? v) (string-length v) (length v))))
-(definir-morfema '("prim.ero" "primero")             'valor first)
-(definir-morfema '("ult.imo" "ultimo")               'valor last)
+;; Sirven para listas y para textos
+(definir-morfema '("prim.ero" "primero")             'valor
+  (lambda (v) (if (string? v) (substring v 0 1) (first v))))
+(definir-morfema '("ult.imo" "ultimo")               'valor
+  (lambda (v) (if (string? v) (substring v (sub1 (string-length v))) (last v))))
+(definir-morfema '("invierte")                       'valor
+  (lambda (v) (if (string? v) (list->string (reverse (string->list v))) (reverse v))))
 (definir-morfema '("suma")                           'valor (lambda (l) (apply + l)))
 (definir-morfema '("producto")                       'valor (lambda (l) (apply * l)))
-(definir-morfema '("invierte")                       'valor reverse)
 (definir-morfema '("ordena")                         'valor (lambda (l) (sort l <)))
 (definir-morfema '("con")                            'valor (lambda (l x) (append l (list x))))
 
 ;; ----- TEXTO -----
 (definir-morfema '("texto")                  'valor texto-rackituq)
+;; "hola".letra:0 -> "h";  "hola mundo".trozo:0:4 -> "hola"
+(definir-morfema '("letra")                  'valor
+  (lambda (v i) (substring v i (add1 i))))
+(definir-morfema '("trozo")                  'valor
+  (lambda (v desde [hasta #f]) (substring v desde (or hasta (string-length v)))))
 (definir-morfema '("mayusculas")             'valor string-upcase)
 (definir-morfema '("minusculas")             'valor string-downcase)
 (definir-morfema '("recorta")                'valor string-trim)
-;; "hola mundo".parte:" " -> ("hola" "mundo");  sin complemento parte por espacios
+;; "hola mundo".parte:" " -> ("hola" "mundo");  sin complemento parte por
+;; espacios, y con "" parte en letras
 (definir-morfema '("parte")                  'valor
-  (lambda (v [sep " "]) (string-split v sep)))
+  (lambda (v [sep " "])
+    (if (string=? sep "")
+        (map string (string->list v))
+        (string-split v sep))))
 ;; ("hola" "mundo").une:" " -> "hola mundo"
 (definir-morfema '("une")                    'valor
   (lambda (l [sep " "]) (string-join (map texto-rackituq l) sep)))
@@ -221,6 +245,22 @@
     (for/fold ([acc (first l)]) ([x (rest l)])
       (aplicar-operacion (first comps) acc (list (listo x))))))
 
+;; ----- ERRORES -----
+;; `intenta:(cadena)` devuelve no si la cadena falla, y con una segunda cadena
+;; usa esa como respaldo; dentro del respaldo, `otro` es el mensaje del error
+(definir-morfema '("intenta") 'crudo
+  (lambda (v comps raiz)
+    (with-handlers ([exn:fail?
+                     (lambda (e)
+                       (if (>= (length comps) 2)
+                           (aplicar-operacion (second comps) v (list (listo (exn-message e))))
+                           #f))])
+      (aplicar-operacion (first comps) v '()))))
+
+;; `falla:"mensaje"` corta la oración con ese error
+(definir-morfema '("falla") 'valor
+  (lambda (v mensaje) (error (format "Error: ~a" mensaje))))
+
 ;; ----- PREDICADOS: sirven con el modo pregunta (?), con -guni y con `solo:` -----
 (definir-morfema '("par")      'valor even?)
 (definir-morfema '("impar")    'valor odd?)
@@ -233,9 +273,16 @@
 (definir-morfema '("igual")    'valor (lambda (v n) (equal? v n)))
 (definir-morfema '("distinto") 'valor (lambda (v n) (not (equal? v n))))
 ;; Combinar condiciones. El complemento suele ser una sub-palabra:
-;; edad.mayor:17.y:(edad.menor:65)   —  los dos lados se evalúan siempre
-(definir-morfema '("y")   'valor (lambda (v otro) (and (not (eq? v #f)) (not (eq? otro #f)))))
-(definir-morfema '("o")   'valor (lambda (v otro) (or (not (eq? v #f)) (not (eq? otro #f)))))
+;; edad.mayor:17.y:(edad.menor:65). Son de corto circuito: el segundo lado
+;; se evalúa solo si hace falta
+(definir-morfema '("y") 'crudo
+  (lambda (v comps raiz)
+    (and (not (eq? v #f))
+         (not (eq? (resolver-valor (first comps)) #f)))))
+(definir-morfema '("o") 'crudo
+  (lambda (v comps raiz)
+    (or (not (eq? v #f))
+        (not (eq? (resolver-valor (first comps)) #f)))))
 (definir-morfema '("no" "niega") 'valor (lambda (v) (eq? v #f)))
 
 ;; ----- TIPOS Y VARIABLES -----
