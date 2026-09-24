@@ -3,7 +3,7 @@
 (require "estado.rkt" "variables.rkt")
 (provide buscar-morfema piezas-maximas aplicar-morfema resolver resolver-valor
          listo texto-rackituq texto-literal? lista-literal? sub-palabra?
-         instalar-evaluador!)
+         instalar-evaluador! instalar-encadenador!)
 
 ;; ----- DICCIONARIO DE MORFEMAS -----
 ;;
@@ -68,9 +68,16 @@
 (define (sub-palabra? elemento)
   (and (string-prefix? elemento "(") (string-suffix? elemento ")")))
 
-;; palabra.rkt instala aquí cómo se evalúa una sub-palabra
+;; Lo que va entre los paréntesis
+(define (interior elemento)
+  (substring elemento 1 (sub1 (string-length elemento))))
+
+;; palabra.rkt instala aquí cómo se evalúa una sub-palabra suelta, y cómo se
+;; aplica una cadena de morfemas a un valor: 1,2,3.cada:(mas:1.por:2)
 (define evaluador-sub-palabra (box #f))
+(define encadenador (box #f))
 (define (instalar-evaluador! f) (set-box! evaluador-sub-palabra f))
+(define (instalar-encadenador! f) (set-box! encadenador f))
 
 ;; Convertir un texto del programa en su valor
 (define (resolver elemento)
@@ -80,12 +87,14 @@
     [(texto-literal? elemento)
      (substring elemento 1 (sub1 (string-length elemento)))]
     ;; Una sub-palabra se evalúa antes: 5.por:(4.menos:1) = 15
-    [(sub-palabra? elemento)
-     ((unbox evaluador-sub-palabra) (substring elemento 1 (sub1 (string-length elemento))))]
+    [(sub-palabra? elemento) ((unbox evaluador-sub-palabra) (interior elemento))]
+    ;; Los sí/no se pueden escribir, no solo salir de un predicado
+    [(string=? elemento "sí") #t]
+    [(string=? elemento "no") #f]
     [(lista-literal? elemento)
      ;; Las comas separan, pero no dentro de las comillas
      (map resolver (regexp-match* regex-pedazo-lista elemento))]
-    [(hash-has-key? variables elemento) (hash-ref variables elemento)]
+    [(variable-existe? elemento) (obtener-variable elemento)]
     [else (error (format "Error: No conozco la palabra ~a" elemento))]))
 
 ;; Los textos se leen como nombres o literales; los demás valores pasan tal cual
@@ -118,9 +127,11 @@
 ;; La operación que reciben cada/solo/junta: un procedimiento de Racket,
 ;; o el nombre de un morfema o función (".sum.ar", "por", "cuadrado")
 (define (aplicar-operacion op valor extras)
-  (if (procedure? op)
-      (apply op valor (map resolver-valor extras))
-      (aplicar-morfema valor (string-trim op "." #:right? #f) extras)))
+  (cond
+    [(procedure? op) (apply op valor (map resolver-valor extras))]
+    ;; Una cadena entre paréntesis se aplica al valor: cada:(mas:1.por:2)
+    [(sub-palabra? op) ((unbox encadenador) (interior op) valor extras)]
+    [else (aplicar-morfema valor (string-trim op "." #:right? #f) extras)]))
 
 ;; Cómo se lee un valor en Rackituq: los booleanos son sí/no
 (define (texto-rackituq v)
@@ -221,6 +232,11 @@
 (definir-morfema '("menor")    'valor (lambda (v n) (< v n)))
 (definir-morfema '("igual")    'valor (lambda (v n) (equal? v n)))
 (definir-morfema '("distinto") 'valor (lambda (v n) (not (equal? v n))))
+;; Combinar condiciones. El complemento suele ser una sub-palabra:
+;; edad.mayor:17.y:(edad.menor:65)   —  los dos lados se evalúan siempre
+(definir-morfema '("y")   'valor (lambda (v otro) (and (not (eq? v #f)) (not (eq? otro #f)))))
+(definir-morfema '("o")   'valor (lambda (v otro) (or (not (eq? v #f)) (not (eq? otro #f)))))
+(definir-morfema '("no" "niega") 'valor (lambda (v) (eq? v #f)))
 
 ;; ----- TIPOS Y VARIABLES -----
 ;; `edad.es:numero?` usa el tipo declarado de la variable si lo tiene
@@ -230,14 +246,18 @@
       (if (and raiz (hash-has-key? tipos raiz))
           (verificar-tipo raiz tipo)
           (eq? (tipo-de v) tipo)))))
-;; `...en:total` guarda el valor en una variable y lo deja seguir
+;; `...en:total` guarda el valor en una variable y lo deja seguir.
+;; Si el nombre ya existe lo actualiza donde viva; si no, lo crea aquí mismo
 (definir-morfema '("en" "guarda") 'crudo
   (lambda (v comps raiz)
-    (let ([nombre (first comps)])
-      (if (hash-has-key? variables nombre)
-          (actualizar-variable nombre v)
-          (definir-variable nombre v))
-      v)))
+    (guardar-variable (first comps) v)
+    v))
+
+;; `...global:total` guarda afuera, aunque estemos dentro de un sufijo
+(definir-morfema '("global") 'crudo
+  (lambda (v comps raiz)
+    (guardar-global (first comps) v)
+    v))
 
 ;; ----- EVALUACIÓN DIFERIDA Y LAMBDAS -----
 (definir-morfema '("lazy" "diferir")            'valor (lambda (x) (delay x)))

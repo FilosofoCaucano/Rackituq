@@ -1,6 +1,6 @@
 #lang racket
 
-(require "estado.rkt" "vocabulario.rkt")
+(require "estado.rkt" "variables.rkt" "vocabulario.rkt")
 (provide hablar evaluar-palabra ejecutar-palabra segmentar explicar tokenizar
          limite-repeticiones)
 
@@ -26,6 +26,19 @@
 
 ;; Los complementos pueden ser sub-palabras entre paréntesis: 5.por:(4.menos:1)
 (instalar-evaluador! (lambda (texto) (ejecutar-palabra texto)))
+
+;; Y una cadena entre paréntesis se puede aplicar a un valor: cada:(mas:1.por:2).
+;; Dentro de la cadena, `esto` es el valor que llega y `otro` el que la acompaña
+;; (el segundo operando de junta:), así se pueden escribir condiciones completas
+(instalar-encadenador!
+ (lambda (texto valor extras)
+   (con-ambito-nuevo
+    (lambda ()
+      (definir-local "esto" valor)
+      (unless (empty? extras)
+        (definir-local "otro" (resolver-valor (first extras))))
+      (ejecutar-palabra (if (string-prefix? texto ".") texto (string-append "." texto))
+                        #:entrada valor)))))
 
 ;; Partir un texto por un carácter, sin mirar dentro de las comillas ni de los
 ;; paréntesis. El punto entre dígitos es decimal, no separador: 3.5 es un número
@@ -98,11 +111,12 @@
 
 ;; ¿La raíz es un literal o una variable?
 (define (tiene-valor? raiz)
-  (or (texto-literal? raiz)
+  (or (member raiz '("sí" "no"))
+      (texto-literal? raiz)
       (lista-literal? raiz)
       (sub-palabra? raiz)
       (string->number raiz)
-      (hash-has-key? variables raiz)))
+      (variable-existe? raiz)))
 
 ;; Evaluar una palabra: devuelve su valor y su modo.
 ;; `posicionales` son los argumentos que van después de la palabra;

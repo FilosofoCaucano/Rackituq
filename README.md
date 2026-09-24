@@ -38,7 +38,8 @@ con `;;` son comentarios. Hay ejemplos en [ejemplos/](ejemplos/).
   lista1 .  solo     :  mayor:15  .  cada:entre:10  .  suma  ?
 ```
 
-- **Raíz**: un valor (`5`, `3.5`, `1,2,3`, `"a","b"`, `"hola"`) o una variable (`lista1`).
+- **Raíz**: un valor (`5`, `3.5`, `1,2,3`, `"a","b"`, `"hola"`, `sí`, `no`) o una
+  variable (`lista1`).
 - **Morfemas**: se aplican de izquierda a derecha, cada uno sobre el resultado
   del anterior, como un pipe de Unix. El punto siempre separa morfemas.
 - **Complementos**: van pegados con `:` (`mas:3`, `sublista:1:3`). Un complemento
@@ -56,6 +57,17 @@ La palabra `sino` parte el condicional en sus dos ramas:
 
 ```
 edad.mayor:17-guni "adulto".muestra sino "menor".muestra
+```
+
+### Cadenas como operación
+
+El complemento de `cada:`, `solo:` y `junta:` puede ser una cadena entre
+paréntesis. Adentro, `esto` es el valor que llega y `otro` el que lo acompaña:
+
+```
+1,2,3.cada:(mas:1.por:2)                        → (4 6 8)
+1,2,3,4,5,6.solo:(mayor:2.y:(esto.menor:6))     → (3 4 5)
+1,2,3.junta:(mas:otro)                          → 6
 ```
 
 ### Ver una palabra por dentro
@@ -97,7 +109,8 @@ dentro de complementos: `cada:sumar:1`.
 | Texto y listas | `conc.atenar`/`concatenar`/`pega`, `long.itud`/`longitud`/`cuenta`, `contiene` |
 | Orden superior | `map`/`cada`, `filter`/`filtra`/`solo`, `reduce`/`junta` — su complemento es otra operación, y se pueden anidar: `cada:cada:por:2` |
 | Predicados | `par`, `impar`, `positivo`, `negativo`, `cero`, `vacia`, `mayor`, `menor`, `igual`, `distinto` |
-| Tipos y variables | `es:numero` (usa el tipo declarado si lo hay), `en:nombre`/`guarda:nombre` (guarda el valor y lo deja seguir) |
+| Condiciones | `y`, `o`, `no`/`niega` — el complemento suele ser una sub-palabra: `edad.mayor:17.y:(edad.menor:65)` |
+| Tipos y variables | `es:numero` (usa el tipo declarado si lo hay), `en:nombre`/`guarda:nombre` (guarda el valor y lo deja seguir), `global:nombre` |
 | Otros | `muestra`/`mostrar`, `lazy`/`diferir`, `force`/`forzar`, `lambda.simple`, `lambda.multi`, `lambda.aplicar`/`aplicar`, `mem.cache`, `mem.limpiar` |
 
 ## Sufijos propios
@@ -117,9 +130,11 @@ definir.sufijo aumentar-en mas:$1
 1,2,3.cada:aumentar-en:10    → (11 12 13)
 ```
 
-Si el cuerpo nombra `$0` (el valor que recibe el sufijo), se lee como una
-oración completa: puede llevar modos y **llamarse a sí mismo**. Así se escribe
-la recursión sin salir de Rackituq:
+El cuerpo es una **cadena** cuando arranca con un morfema (`mas:$1`), y una
+**oración completa** cuando arranca con cualquier otra cosa: una raíz, una
+variable o `$0`, que es el valor que recibe el sufijo. Una oración puede
+llevar modos y **llamarse a sí misma**, así que la recursión se escribe sin
+salir de Rackituq:
 
 ```
 definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
@@ -132,6 +147,27 @@ definir.sufijo cuenta-atras $0.cero-guni "despegue".muestra sino $0.muestra.meno
 
 Las funciones definidas con `definir.funcion` y `definir.funcion.recursiva`
 también se pegan como sufijos: `5.fact.mas:1`.
+
+### Variables locales
+
+Cada llamada a un sufijo abre su propio ámbito: lo que guarde con `en:` es
+local a esa llamada y no pisa lo de las otras. Por eso esta recursión, que
+guarda **antes** de llamarse a sí misma, da bien:
+
+```
+definir.sufijo fact $0.menor:2-guni 1 sino $0.en:n ($0.menos:1.fact).por:n
+5.fact                       → 120
+```
+
+Un nombre se busca de adentro hacia afuera, así que desde un sufijo se leen
+las variables de arriba. Para **escribir** una de afuera está `global:`:
+
+```
+definir.variable total 0
+definir.sufijo acumular $0.mas:total.global:total
+5.acumular                   → 5
+7.acumular                   → 12
+```
 
 ## Comandos especiales
 

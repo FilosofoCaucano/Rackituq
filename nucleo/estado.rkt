@@ -16,3 +16,7 @@
 
 ;; Caché para optimización de memoria
 (define memoria-cache (make-hash))
+
+;; Pila de ámbitos locales: cada llamada a un sufijo o función abre uno.
+;; Las variables de arriba viven en `variables`, que es el ámbito global
+(define ambitos (box '()))

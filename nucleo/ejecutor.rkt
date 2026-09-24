@@ -79,7 +79,7 @@
     [(string=? comando "mostrar.salida")
      (if y
          ;; El valor puede ser el nombre de una variable: mostrar.salida "Hola ~a" nombre
-         (mostrar-salida x (if (and (string? y) (hash-has-key? variables y)) (hash-ref variables y) y))
+         (mostrar-salida x (if (and (string? y) (variable-existe? y)) (obtener-variable y) y))
          (mostrar-salida "~a" x))]
     
     ;; Manejo de memoria
@@ -109,16 +109,26 @@
 ;; oración completa, así puede llevar modos y llamarse a sí mismo:
 ;;   (definir-sufijo "fact" "$0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)")
 (define (definir-sufijo nombre cuerpo)
-  (let ([oracion? (string-contains? cuerpo "$0")])
+  ;; Es una cadena si arranca con un morfema (`mas:$1`, `.a-la:2`); si arranca
+  ;; con otra cosa (una raíz, una variable, $0) es una oración completa
+  (let* ([primer-nombre (car (regexp-split #px"[.: ]" cuerpo))]
+         [cadena? (and (not (string-contains? cuerpo "$0"))
+                       (or (string=? primer-nombre "")
+                           (buscar-morfema primer-nombre)))]
+         [oracion? (not cadena?)])
     (hash-set! funciones nombre
                (lambda (v . args)
                  (let ([texto (reemplazar-huecos cuerpo nombre v args)])
-                   (if oracion?
-                       (hablar texto)
-                       (ejecutar-palabra (if (string-prefix? texto ".")
-                                             texto
-                                             (string-append "." texto))
-                                         #:entrada v)))))
+                   ;; Cada llamada tiene su propio ámbito: lo que guarde con
+                   ;; `en:` no pisa al de las otras llamadas
+                   (con-ambito-nuevo
+                    (lambda ()
+                      (if oracion?
+                          (hablar texto)
+                          (ejecutar-palabra (if (string-prefix? texto ".")
+                                                texto
+                                                (string-append "." texto))
+                                            #:entrada v)))))))
     (format "Sufijo ~a definido como ~a" nombre cuerpo)))
 
 ;; Cambiar $0 por el valor que recibe el sufijo, y $1, $2, ... por sus complementos
@@ -139,7 +149,9 @@
 (define (definir-funcion nombre operacion parametro)
   (hash-set! funciones nombre
              (lambda (x . _)
-               (ejecutar-palabra operacion (sin-vacios-al-final (list parametro)) #:entrada x)))
+               (con-ambito-nuevo
+                (lambda ()
+                  (ejecutar-palabra operacion (sin-vacios-al-final (list parametro)) #:entrada x)))))
   (format "Función ~a definida." nombre))
 
 ;; Función para definir una función recursiva

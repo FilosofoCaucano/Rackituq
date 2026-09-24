@@ -219,6 +219,47 @@
                                "chico\n"
                                "   muestra  →  chico\n")))
 
+(test-case "cada llamada a un sufijo tiene sus variables locales"
+  ;; guarda ANTES de la llamada recursiva: sin ámbitos locales se pisaría
+  (ejecutar-linea "definir.sufijo p-fact2 $0.menor:2-guni 1 sino $0.en:n ($0.menos:1.p-fact2).por:n")
+  (check-equal? (hablar "5.p-fact2") 120)
+  (check-equal? (hablar "1,2,3,4,5.cada:p-fact2") '(1 2 6 24 120))
+  ;; lo local no se filtra hacia afuera
+  (check-exn #rx"No conozco la palabra n" (lambda () (hablar "n"))))
+
+(test-case "en: guarda aquí y global: guarda afuera"
+  (ejecutar-linea "definir.variable p-total 0")
+  (ejecutar-linea "definir.sufijo p-acumular $0.mas:p-total.global:p-total")
+  (check-equal? (hablar "5.p-acumular") 5)
+  (check-equal? (hablar "7.p-acumular") 12)
+  (check-equal? (hablar "p-total") 12)
+  ;; el mismo sufijo con en: no toca la global
+  (ejecutar-linea "definir.sufijo p-no-toca $0.en:p-total p-total")
+  (check-equal? (hablar "99.p-no-toca") 99)
+  (check-equal? (hablar "p-total") 12))
+
+(test-case "un sufijo que no arranca con morfema se lee como oración"
+  (ejecutar-linea "definir.variable p-cuenta 0")
+  (ejecutar-linea "definir.sufijo p-contar p-cuenta.mas:1.global:p-cuenta")
+  (hablar "1,2,3.cada:p-contar")
+  (check-equal? (hablar "p-cuenta") 3))
+
+(test-case "condiciones combinadas con y, o, no"
+  (ejecutar-linea "definir.variable p-anios 30")
+  (check-equal? (hablar "p-anios.mayor:17.y:(p-anios.menor:65)?") "sí")
+  (check-equal? (hablar "p-anios.mayor:17.y:(p-anios.menor:25)?") "no")
+  (check-equal? (hablar "p-anios.mayor:99.o:(p-anios.par)?") "sí")
+  (check-equal? (hablar "p-anios.mayor:99.no?") "sí")
+  ;; sí y no también se pueden escribir
+  (check-equal? (hablar "sí.y:(no)?") "no")
+  (check-equal? (hablar "no.no?") "sí"))
+
+(test-case "una cadena entre paréntesis sirve de operación"
+  (check-equal? (hablar "1,2,3.cada:(mas:1.por:2)") '(4 6 8))
+  ;; `esto` es el valor que llega; `otro` el que lo acompaña en junta:
+  (check-equal? (hablar "1,2,3,4,5,6.solo:(mayor:2.y:(esto.menor:6))") '(3 4 5))
+  (check-equal? (hablar "1,2,3.junta:(mas:otro)") 6))
+
 (test-case "errores claros"
   (check-exn #rx"No conozco la palabra banana" (lambda () (hablar "banana.suma")))
   (check-exn #rx"No conozco el sufijo volar" (lambda () (hablar "5.volar")))

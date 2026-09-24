@@ -1,0 +1,16 @@
+;; Condiciones combinadas, ámbitos locales y cadenas como operación
+
+definir.variable edades 12,17,18,30,64,70
+
+;; y / o / no: quiénes están en edad de trabajar
+edades.solo:(mayor:17.y:(esto.menor:65)).mostrar
+
+;; Contar con una variable global desde dentro de un sufijo
+definir.variable cuantos 0
+definir.sufijo contar 1.mas:cuantos.global:cuantos
+edades.cada:contar
+cuantos.texto.concatenar:" personas".mostrar
+
+;; Recursión con una variable local: sumar 1+2+...+n
+definir.sufijo triangular $0.menor:2-guni $0 sino $0.en:n ($0.menos:1.triangular).mas:n
+5.triangular.mostrar

@@ -1,8 +1,8 @@
 # Rackituq hoy: qué puede y qué no puede
 
-Estado al 22 de septiembre de 2026. Todo lo que dice este documento está
+Estado al 23 de septiembre de 2026. Todo lo que dice este documento está
 probado corriendo el código, no leyéndolo. Las pruebas (`raco test pruebas.rkt`)
-son 29 y pasan.
+son 34 y pasan.
 
 Rackituq es un lenguaje aglutinante: un programa puede ser **una sola palabra**,
 armada pegándole sufijos a una raíz, como en kalaallisut (groenlandés).
@@ -25,8 +25,8 @@ orden superior, tipos y salida. Cada uno tiene su nombre clásico con punto
 
 ### Valores
 Números enteros, decimales y fracciones exactas (`39/5`, y `.decimal` lo
-vuelve `7.8`), textos, listas de números, de textos o mezcladas, y los
-sí/no que devuelven los predicados.
+vuelve `7.8`), textos, listas de números, de textos o mezcladas, y `sí`/`no`,
+que ahora también se pueden escribir, no solo salir de un predicado.
 
 ### Variables y tipos
 ```
@@ -46,6 +46,13 @@ i.menor:5-gaangat i.mas:1.en:i
 `-guni` es el condicional y `-gaangat` el habitual, los dos tomados del
 kalaallisut. `?` es el modo pregunta.
 
+Las condiciones se combinan con `y`, `o` y `no`:
+
+```
+edad.mayor:17.y:(edad.menor:65)?             → sí
+edad.mayor:99.no?                            → sí
+```
+
 ### Sub-palabras entre paréntesis
 ```
 5.por:(4.menos:1)                            → 15
@@ -64,6 +71,26 @@ definir.sufijo fact $0.menor:2-guni 1 sino $0.por:($0.menos:1.fact)
 `$1`, `$2` son los complementos del sufijo; `$0` es el valor que recibe, y
 usarlo convierte el cuerpo en una oración completa, que puede llamarse a sí
 misma. Con esto la recursión se escribe **sin salir de Rackituq**.
+
+### Variables locales
+Cada llamada a un sufijo abre su propio ámbito, así que lo que guarda con
+`en:` no pisa lo de las otras llamadas. Esta recursión guarda **antes** de
+llamarse a sí misma y da bien:
+
+```
+definir.sufijo fact $0.menor:2-guni 1 sino $0.en:n ($0.menos:1.fact).por:n
+5.fact                                       → 120
+```
+Para escribir una variable de afuera desde adentro está `global:`.
+
+### Cadenas como operación
+El complemento de `cada:`, `solo:` y `junta:` puede ser una cadena entre
+paréntesis; adentro, `esto` es el valor que llega y `otro` el que lo acompaña:
+
+```
+1,2,3.cada:(mas:1.por:2)                     → (4 6 8)
+1,2,3,4,5,6.solo:(mayor:2.y:(esto.menor:6))  → (3 4 5)
+```
 
 ### Programas guardados
 Un archivo `.rkq` es una línea por instrucción, con comentarios `;;`.
@@ -96,62 +123,46 @@ corta solo y explica por qué, en vez de colgarse.
 
 ## Lo que todavía no puede
 
-### 1. No hay variables locales
-Todo lo que guarda `en:` es global. Una función recursiva que quiera guardar
-un resultado intermedio se pisa a sí misma entre llamadas. Por eso la
-recursión de hoy funciona solo cuando el valor se va pasando por la cadena,
-sin guardarlo.
-
-### 2. No se pueden combinar condiciones
-No existen `y`, `o` ni `no`. `5.mayor:1.y:(5.menor:9)` falla. Para condiciones
-compuestas no hay forma directa todavía.
-
-### 3. No hay literales de sí/no
-`sí` y `no` salen solo como resultado de un predicado; no se pueden escribir.
-
-### 4. Las sub-palabras no aceptan espacios
+### 1. Las sub-palabras no aceptan espacios
 `5.por:(2 .mas:1)` falla, porque la oración se parte por espacios antes de
 mirar los paréntesis.
 
-### 5. Una sub-palabra no sirve como operación de `cada:`
-`1,2,3.cada:(algo)` no funciona: el complemento de `cada:` tiene que ser el
-nombre de un morfema o de un sufijo, no una palabra armada ahí mismo.
-
-### 6. Varias cosas todavía se escriben en Racket, no en Rackituq
-- `definir.funcion.recursiva` pide el cuerpo como expresión de Racket.
+### 2. Varias cosas todavía se escriben en Racket, no en Rackituq
+- `definir.funcion.recursiva` pide el cuerpo como expresión de Racket (aunque
+  ya no hace falta: la recursión se escribe con `definir.sufijo` y `$0`).
 - `lambda.simple`, `lambda.multi` y `mem.cache` necesitan procedimientos de
   Racket, así que desde el REPL son casi inusables.
 - `exportar.modulo` guarda variables, pero no funciones ni sufijos.
 
-### 7. Los textos no se indexan
+### 3. Los textos no se indexan
 `"hola".ind.ice:0` falla; `ind.ice` es solo para listas. Tampoco hay forma de
 cambiar un elemento de una lista en su lugar.
 
-### 8. No hay diccionarios ni estructuras propias
+### 4. No hay diccionarios ni estructuras propias
 Solo números, textos, listas y sí/no. No se pueden definir tipos nuevos.
 
-### 9. No hay manejo de errores dentro del lenguaje
+### 5. No hay manejo de errores dentro del lenguaje
 Un error corta la oración. No existe algo como "intentá esto y si falla hacé
 aquello".
 
-### 10. La entrada de usuario es solo clásica
+### 6. La entrada de usuario es solo clásica
 `leer.input` funciona como comando, pero no hay un morfema que lea del
 teclado dentro de una palabra.
 
-### 11. Los tipos son mínimos
+### 7. Los tipos son mínimos
 Cinco tipos (`numero`, `texto`, `lista`, `booleano`, `funcion`), y solo se
 revisan en variables declaradas con `definir.variable.tipo`. Los morfemas y
 los sufijos no declaran qué reciben ni qué devuelven: un error de tipo
 aparece recién al correr.
 
-### 12. Rendimiento de la recursión
+### 8. Rendimiento de la recursión
 Cada llamada recursiva reemplaza `$0` por el valor y vuelve a analizar el
 texto. Hoy `fib 22` tarda unos 0,8 segundos (antes de optimizar tardaba 33).
 Sirve para aprender y para programas chicos, no para cálculo pesado. Tampoco
 hay optimización de llamada final, así que una recursión muy profunda puede
 agotar la memoria.
 
-### 13. Dos estilos conviviendo
+### 9. Dos estilos conviviendo
 El estilo clásico (`x.sum.ar 2 3`) y el aglutinante usan el mismo motor, pero
 la regla que los distingue en el REPL tiene bordes raros: si existe una
 variable llamada `x`, `x.sum.ar 2 3` usa su valor en vez de tomar el 2 como
@@ -163,7 +174,7 @@ entrada.
 
 ```
 Lengua Rackituq.rkt     punto de entrada: demo o corre un .rkq
-pruebas.rkt             29 pruebas
+pruebas.rkt             34 pruebas
 ejemplos/               programas .rkq
 nucleo/
   vocabulario.rkt       el diccionario de morfemas (aquí se agregan nuevos)
@@ -188,10 +199,10 @@ nuevo es agregar una línea, no una rama más en un `cond`.
 
 En el orden en que más destraban el lenguaje:
 
-1. **Variables locales** en sufijos y funciones. Sin esto, la recursión con
-   resultados intermedios no se puede escribir.
-2. **`y`, `o`, `no`** para condiciones compuestas.
-3. **Sub-palabras como operación** de `cada:` y `solo:`.
-4. **Morfemas de texto por posición** (`letra:0`, `trozo:1:3`).
-5. **Guardar sufijos y funciones** en los módulos, para poder armar una
-   biblioteca en Rackituq.
+1. **Morfemas de texto por posición** (`letra:0`, `trozo:1:3`), que hoy no existen.
+2. **Guardar sufijos y funciones** en los módulos, para poder armar una
+   biblioteca escrita en Rackituq.
+3. **Manejo de errores** dentro del lenguaje.
+4. **Corto circuito en `y` / `o`**: hoy los dos lados se evalúan siempre.
+5. **Acelerar la recursión**, guardando el análisis de cada palabra en vez de
+   rehacerlo en cada llamada.
